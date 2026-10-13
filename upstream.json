@@ -33,6 +33,16 @@
         "reason": "CC BY-NC 4.0, incompatible with redistributing under this repo's Apache-2.0, and ambiguous for a university that also does industry-funded contract research. Yields only 4 skills \u2014 its 40k stars are for the surrounding plugin, which this overlay does not install \u2014 and its deep-research collides with both upstream ECC's and our custom-deep-research. The K-Dense set above covers the same ground under MIT. Decided 2026-07-30."
       }
     },
+    "custom-skills-herdr": {
+      "repo": "https://github.com/herdrdev/herdr.git",
+      "ref": "v0.9.3",
+      "sha": "7b116c05bfda646af39d2524c54e70c751f57ee8",
+      "vendoredOn": "2026-10-13",
+      "path": "skills",
+      "license": "Apache-2.0",
+      "skillCount": 1,
+      "portNotes": "The official herdr skill, byte-identical to skills/herdr/SKILL.md at the v0.9.3 release tag, into custom/skills/ (same module, custom-skills). Single file, no scripts. The repo was formerly ogulcancelik/herdr, which now redirects here; herdr's own docs still use the old name. Its description asks to load only when Herdr is named, and the body stops unless HERDR_ENV=1, so it costs only its description in sessions that do not use Herdr."
+    },
     "atlassian-agent": {
       "repo": "https://github.com/danielvogler/atlassian_agent.git",
       "package": "atlassian-agent-mcp",
