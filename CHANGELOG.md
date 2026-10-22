@@ -9,6 +9,13 @@ library with an API.
 
 ## [Unreleased]
 
+Run `make setup-user` again after `make update`.
+
+- The deny rule for `gcloud ... delete` now matches. It was written as
+  `Bash(gcloud * delete:*)`, which Claude Code reads as a literal prefix, so deletes were
+  never blocked and Claude Code warned on every start. `make setup-user` replaces it with
+  `Bash(gcloud * delete*)` and removes the old entry.
+
 ## [v0.2.0] — 2026-10-04
 
 Run `make update`, then `make mcp`. If `make mcp` prints a `[note]` about a stored token,
