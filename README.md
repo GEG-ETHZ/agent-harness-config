@@ -225,6 +225,8 @@ agent-harness-config/
 │   ├── check-profile.py             ← the custom profile still resolves after materialize
 │   ├── context-cost.py              ← what the config costs in context per session
 │   └── doctor.py                    ← is what you have installed still current?
+├── sandbox/                         ← claude-sb: Claude Code inside an OS sandbox (own install,
+│                                      see sandbox/README.md)
 ├── Makefile                         ← install / update / doctor / context / check / mcp
 ├── UPSTREAM.md                      ← the pin, every delta, and known issues
 ├── CHANGELOG.md                     ← what changed between tags
