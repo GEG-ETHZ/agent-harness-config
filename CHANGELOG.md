@@ -15,6 +15,9 @@ Run `make setup-user` again after `make update`.
   `Bash(gcloud * delete:*)`, which Claude Code reads as a literal prefix, so deletes were
   never blocked and Claude Code warned on every start. `make setup-user` replaces it with
   `Bash(gcloud * delete*)` and removes the old entry.
+- No emoji in commit messages, in any repo. `make setup-user` wires a third guard,
+  `block-commit-emoji`, that refuses such a commit, and repos get a matching commit-msg
+  hook to copy. Run `make setup-user` again after updating.
 
 ## [v0.2.0] — 2026-10-04
 
