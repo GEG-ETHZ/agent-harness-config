@@ -17,7 +17,8 @@ Run `make setup-user` again after `make update`.
   `Bash(gcloud * delete*)` and removes the old entry.
 - No emoji in commit messages, in any repo. `make setup-user` wires a third guard,
   `block-commit-emoji`, that refuses such a commit, and repos get a matching commit-msg
-  hook to copy. Run `make setup-user` again after updating.
+  hook to copy. As before, `make setup-user` resets Claude Code's hooks to the guards, so
+  a tool that adds its own hook (herdr) has to install it again afterwards.
 - `git.md`: before the first push an agent runs `git push --dry-run`, and when it is
   refused hands the person the exact command instead of trying other credentials. Commits
   made while iterating are regrouped into one per logical change before the push.
