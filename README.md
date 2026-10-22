@@ -310,7 +310,7 @@ spend.** Merge into `permissions.allow` in `~/.claude/settings.json`:
       "Bash(make validate:*)", "Bash(make doctor:*)", "Bash(make context:*)", "Bash(make plan:*)"
     ],
     "deny": [
-      "Bash(gcloud * delete:*)", "Bash(bq rm:*)", "Bash(gsutil rm -r:*)",
+      "Bash(gcloud * delete*)", "Bash(bq rm:*)", "Bash(gsutil rm -r:*)",
       "Bash(terraform destroy:*)", "Bash(rm -rf:*)",
       "Read(**/*service-account*.json)", "Read(**/.env)", "Read(**/id_rsa)", "Read(**/id_ed25519)"
     ]
