@@ -27,6 +27,9 @@ Run `make setup-user` again after `make update`.
 - `docs.md` now also covers HTML and SVG. Every rendered page is looked at before it is
   reported done, and titles are plain statements without the usual machine-written
   patterns.
+- New skill `close-session`: answers "can I close this?" from uncommitted and unpushed
+  work, open pull requests, worktrees, running jobs, ledgers and decisions held only in the
+  conversation.
 
 ## [v0.2.0] — 2026-10-04
 
