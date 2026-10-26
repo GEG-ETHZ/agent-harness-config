@@ -14,6 +14,10 @@ import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+// The one place the srt version is pinned. The Makefile installs it, and the
+// launcher refuses any other: it relies on how this version builds the
+// sandbox and handles a policy without a network block.
+const SRT_VERSION = '0.0.79';
 const USAGE = "usage: claude-sb-run.mjs SRT_DIST POLICY (-c 'command' | -- command [args...])";
 
 function fail(message) {
@@ -29,8 +33,24 @@ function parseArgs(argv) {
   return fail(USAGE);
 }
 
-async function importFromSrt(srtDist, relativePath) {
-  return import(pathToFileURL(join(srtDist, relativePath)).href);
+function checkSrtVersion(srtDist) {
+  let version;
+  try {
+    version = JSON.parse(readFileSync(join(srtDist, '..', 'package.json'), 'utf8')).version;
+  } catch (error) {
+    return fail(`cannot read srt's version next to ${srtDist}: ${error.message}`);
+  }
+  if (version !== SRT_VERSION) {
+    fail(`srt ${version} is installed, claude-sb needs ${SRT_VERSION}. In agent-harness-config, run: make sandbox-install`);
+  }
+}
+
+// POSIX shell quoting: plain words stay as they are, anything else goes in
+// single quotes, with each ' written as '\''.
+function shellQuote(args) {
+  return args
+    .map((arg) => (/^[A-Za-z0-9_\/.,:=@%+-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, "'\\''")}'`))
+    .join(' ');
 }
 
 function loadPolicy(policyPath, SandboxRuntimeConfigSchema) {
@@ -58,8 +78,11 @@ function loadPolicy(policyPath, SandboxRuntimeConfigSchema) {
 
 async function main() {
   const { srtDist, policyPath, commandString, commandArgs } = parseArgs(process.argv.slice(2));
-  const { SandboxManager, SandboxRuntimeConfigSchema } = await importFromSrt(srtDist, 'index.js');
-  const { quote } = await importFromSrt(srtDist, 'utils/shell-quote.js');
+  checkSrtVersion(srtDist);
+  // index.js is the package's entry point ("main"), not an internal file.
+  const { SandboxManager, SandboxRuntimeConfigSchema } = await import(
+    pathToFileURL(join(srtDist, 'index.js')).href
+  );
 
   // Registered before anything slow, so Ctrl+C while the sandbox is being
   // prepared stops the launch instead of being lost.
@@ -71,7 +94,7 @@ async function main() {
   const policy = loadPolicy(policyPath, SandboxRuntimeConfigSchema);
   await SandboxManager.initialize(policy);
 
-  const command = commandString ?? quote(commandArgs);
+  const command = commandString ?? shellQuote(commandArgs);
   const sandboxed = await SandboxManager.wrapWithSandbox(command);
   child = spawn(sandboxed, { shell: true, stdio: 'inherit' });
 

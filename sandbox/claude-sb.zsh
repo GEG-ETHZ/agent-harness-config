@@ -131,8 +131,14 @@ _claude_sb_token() {
 
 claude-sb() {
   if ! command -v srt >/dev/null 2>&1; then
-    print -u2 "claude-sb: srt not found. Install it with:"
-    print -u2 "  npm i -g @anthropic-ai/sandbox-runtime@0.0.79"
+    print -u2 "claude-sb: srt not found. In agent-harness-config, run: make sandbox-install"
+    return 1
+  fi
+  # A classic token (ghp_) has no Contents: read-only setting: with it, git
+  # push works from inside, and so does everything else the token allows.
+  if [[ ${GITHUB_PERSONAL_ACCESS_TOKEN:-} == ghp_* ]]; then
+    print -u2 "claude-sb: GITHUB_PERSONAL_ACCESS_TOKEN is a classic token, which can push code."
+    print -u2 "  Use a fine-grained token with Contents: read (see sandbox/README.md, git and GitHub)."
     return 1
   fi
   local file

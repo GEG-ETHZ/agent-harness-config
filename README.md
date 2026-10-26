@@ -225,8 +225,8 @@ agent-harness-config/
 │   ├── check-profile.py             ← the custom profile still resolves after materialize
 │   ├── context-cost.py              ← what the config costs in context per session
 │   └── doctor.py                    ← is what you have installed still current?
-├── sandbox/                         ← claude-sb: Claude Code inside an OS sandbox (own install,
-│                                      see sandbox/README.md)
+├── sandbox/                         ← claude-sb: Claude Code inside an OS sandbox
+│                                      (optional, make sandbox-install; sandbox/README.md)
 ├── Makefile                         ← install / update / doctor / context / check / mcp
 ├── UPSTREAM.md                      ← the pin, every delta, and known issues
 ├── CHANGELOG.md                     ← what changed between tags
@@ -245,6 +245,20 @@ make install
 
 That is once per person, per machine. Run `make plan` first if you want to see what it will
 write before it writes anything, and `make uninstall` to remove everything it wrote.
+
+### Optional: claude-sb, Claude Code in a sandbox (macOS)
+
+`claude-sb` runs Claude Code inside an operating-system sandbox, so a supervised session can
+run in `auto` mode without changing anything outside the project or reading your
+credentials. It is not part of `make install`:
+
+```bash
+make sandbox-install   # the pinned sandbox-runtime, ~/.config/claude-sb/, a line in ~/.zshrc
+make sandbox-test      # probe the policy
+```
+
+What it blocks, what it does not, and the login token it needs: `sandbox/README.md`.
+`make doctor` reports an installed copy that is older than `sandbox/`.
 
 ### Cursor and Antigravity are project-scoped
 

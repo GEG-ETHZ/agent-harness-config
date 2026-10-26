@@ -10,24 +10,24 @@ unchanged.
 
 ## Install (once)
 
-In a normal terminal, not inside `claude-sb`:
+In a normal terminal, not inside `claude-sb`, from the root of this repo:
 
 ```bash
-npm i -g @anthropic-ai/sandbox-runtime@0.0.79
-mkdir -p ~/.config/claude-sb
-cp sandbox/policy.json sandbox/claude-sb-run.mjs sandbox/claude-sb.zsh \
-   sandbox/agent-guidance.md ~/.config/claude-sb/
-echo '[[ -r ~/.config/claude-sb/claude-sb.zsh ]] && source ~/.config/claude-sb/claude-sb.zsh' >> ~/.zshrc
+make sandbox-install
 claude setup-token     # prints a long-lived login token
 security add-generic-password -U -s claude-sb-oauth -a "$USER" -w   # paste it
 ```
 
-The sandbox cannot use the Keychain, so `claude-sb` fetches this login token
-before it starts the sandbox and passes it to Claude Code.
+`make sandbox-install` installs the `srt` version the launcher is pinned to,
+copies the files to `~/.config/claude-sb/`, and adds the line that loads
+`claude-sb` to `~/.zshrc`. Running it again only adds what is missing. The
+sandbox cannot use the Keychain, so `claude-sb` fetches the login token before
+it starts the sandbox and passes it to Claude Code.
 
-The four files are copied, not linked: an agent working in this repo must not
-be able to change its own live policy, or the code every new shell runs. After
-changing one of them here, copy it again and restart `claude-sb`.
+The files are copied, not linked: an agent working in this repo must not be
+able to change its own live policy, or the code every new shell runs. After
+changing one of them here, run `make sandbox-install` again and open a new
+terminal; `make doctor` reports an installed copy that is out of date.
 
 ## Use
 
@@ -80,7 +80,7 @@ To change the policy:
 1. See what was denied: file blocks show in
    `/usr/bin/log stream --style compact --predicate 'sender == "Sandbox"'`.
 2. Add the narrowest rule to `sandbox/policy.json` and to the tables below.
-3. Copy it to `~/.config/claude-sb/`, restart `claude-sb`, and run the tests.
+3. Run `make sandbox-test`, then `make sandbox-install`, and restart `claude-sb`.
 
 ## What it protects against, and what not
 
@@ -129,10 +129,10 @@ could use to act on other systems.
 | `~/Library/Keychains` | macOS Keychain | With it readable, `security` inside reads any item, the `gh` token included. |
 | `~/.zsh_history`, `~/.zsh_sessions`, `~/.bash_history`, `~/.python_history`, `~/.node_repl_history` | Shell and REPL histories (`~/.zsh_sessions` is the per-window history of macOS Terminal) | Tokens and passwords typed into commands (`export TOKEN=...`). |
 | `~/.git-credentials`, `~/.config/git/credentials` | Passwords stored by git's `store` helper | Push to any git host. |
-| `~/.npmrc`, `~/.pypirc`, `~/.cargo/credentials*`, `~/.m2/settings.xml`, `~/.gradle/gradle.properties` | Package registry logins | Publish packages as you. Only the credential files: the rest of `~/.cargo`, `~/.m2` and `~/.gradle` holds caches the tools need. |
+| `~/.npmrc`, `~/.pypirc`, `~/.cargo/credentials`, `~/.cargo/credentials.toml`, `~/.m2/settings.xml`, `~/.gradle/gradle.properties` | Package registry logins | Publish packages as you. Only the credential files: the rest of `~/.cargo`, `~/.m2` and `~/.gradle` holds caches the tools need. |
 | `~/.terraform.d/credentials.tfrc.json`, `~/.azure`, `~/.config/op`, `~/.config/glab-cli`, `~/.databrickscfg`, `~/.cache/huggingface/token` | Terraform Cloud, Azure, 1Password CLI, GitLab CLI, Databricks and Hugging Face logins | Act on those services as you. |
 | `~/.docker`, `~/.colima`, `~/.orbstack`, `~/.rd`, `~/.local/share/containers`, `~/.kube` | Container registry logins, the folders of Docker alternatives (Colima, OrbStack, Rancher Desktop, Podman), Kubernetes logins | Push images, act on clusters. Whether closing a folder also stops a connection to a socket inside it is not tested; the removed `DOCKER_HOST` is the main guard. |
-| `~/Library/Application Support/Slack`, `.../Microsoft/Teams`, `~/Library/Containers/com.microsoft.teams2` | Chat app data | Session cookies: read and post messages as you. |
+| `~/Library/Application Support/Slack`, `~/Library/Application Support/Microsoft/Teams`, `~/Library/Containers/com.microsoft.teams2` | Chat app data | Session cookies: read and post messages as you. |
 | `/**/.env`, `/**/.env.*` | Project secrets, in any project | API keys and passwords next to the code, `.env.local` and `.env.production` included. |
 
 ### `denyRead`: private folders
@@ -147,7 +147,7 @@ first thing a manipulated agent would send out.
 | `~/Library/Mobile Documents`, `~/Library/CloudStorage` | iCloud Drive, and Dropbox, OneDrive and Google Drive folders. |
 | `~/Library/Mail`, `~/Library/Messages`, `~/Library/Calendars` | Mail, iMessage history, calendars. |
 | `~/Library/Application Support/AddressBook`, `~/Library/Group Containers/group.com.apple.notes` | Contacts, Notes. |
-| `~/Library/Safari`, `~/Library/Containers/com.apple.Safari`, `~/Library/Cookies`, and the Chrome, Firefox, Edge, Brave and Arc profiles under `~/Library/Application Support` | History, saved sessions and cookies. A session cookie is a login to its site. |
+| `~/Library/Safari`, `~/Library/Containers/com.apple.Safari`, `~/Library/Cookies`, and the browser profiles under `~/Library/Application Support`: `Google/Chrome`, `Firefox`, `Microsoft Edge`, `BraveSoftware`, `Arc` | History, saved sessions and cookies. A session cookie is a login to its site. |
 
 ### `allowRead`: exceptions inside `denyRead`
 
@@ -223,7 +223,9 @@ untouched:
 | `url.https://github.com/.insteadOf` = `git@github.com:`, `ssh://git@github.com/` | Remotes cloned over SSH fetch over HTTPS, without changing the clone. |
 
 This is safe only if the token may **read code, not write it**: a fine-grained
-token with Contents: read, limited to the repositories you work in. Fetch and
+token with Contents: read and no Workflows: write, limited to the repositories
+you work in. `claude-sb` refuses to start with a classic token (`ghp_...`),
+which cannot be limited that way. Fetch and
 clone then work, private repos included, and GitHub refuses `git push` with
 "Write access to repository not granted". Pull requests, issues and comments go
 through the GitHub MCP server. If the token is ever given Contents: write,
@@ -243,15 +245,17 @@ command.
 In a normal terminal:
 
 ```bash
-sandbox/tests/run.sh                                   # the installed copies
-sandbox/tests/run.sh sandbox/policy.json sandbox/claude-sb-run.mjs sandbox/claude-sb.zsh   # the repo
+make sandbox-test           # the files in sandbox/
+sandbox/tests/run.sh        # the installed copies in ~/.config/claude-sb/
 ```
 
 It runs each probe through the launcher from a throwaway project and exits
 non-zero if anything that must be blocked is not, or normal work fails. Probes
 that fail even outside the sandbox are reported as `skip`. The git fetch and
 push probes run only with `CLAUDE_SB_TEST_REPO` set to the SSH URL of a private
-repo the GitHub token can read. Hooks and MCP servers need a real session: in
+repo the GitHub token can read; without it, the run ends with a warning that
+push was not tested. `make test` checks, without macOS or srt, that every
+policy entry is documented here and that the scripts parse. Hooks and MCP servers need a real session: in
 `claude-sb`, `/mcp` lists the servers.
 
 ## Limitations

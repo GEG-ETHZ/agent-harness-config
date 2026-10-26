@@ -1036,3 +1036,67 @@ class TestMain:
         # Assert
         assert code == 1
         assert "Nothing is installed" in capsys.readouterr().out
+
+
+class TestSandbox:
+    @pytest.fixture
+    def repo_sandbox(self, repo: Path, doctor) -> Path:
+        sandbox = repo / "sandbox"
+        sandbox.mkdir()
+        for name in doctor.SANDBOX_FILES:
+            (sandbox / name).write_text(f"{name} v1\n")
+        return sandbox
+
+    @pytest.fixture
+    def installed(self, tmp_path: Path, monkeypatch) -> Path:
+        home = tmp_path / "home"
+        monkeypatch.setenv("HOME", str(home))
+        return home / ".config" / "claude-sb"
+
+    def install(self, sandbox: Path, installed: Path) -> None:
+        installed.mkdir(parents=True)
+        for path in sandbox.iterdir():
+            (installed / path.name).write_bytes(path.read_bytes())
+
+    def test_says_nothing_when_claude_sb_is_not_installed(self, doctor, repo_sandbox, installed):
+        # Act
+        doctor.check_sandbox()
+
+        # Assert
+        assert doctor.findings == []
+
+    def test_ok_when_the_installed_copy_matches(self, doctor, repo_sandbox, installed):
+        # Arrange
+        self.install(repo_sandbox, installed)
+
+        # Act
+        doctor.check_sandbox()
+
+        # Assert
+        assert statuses(doctor) == [doctor.OK]
+
+    def test_names_the_file_changed_since_install(self, doctor, repo_sandbox, installed):
+        # Arrange
+        self.install(repo_sandbox, installed)
+        (repo_sandbox / "policy.json").write_text("policy.json v2\n")
+
+        # Act
+        doctor.check_sandbox()
+
+        # Assert
+        assert statuses(doctor) == [doctor.ERR]
+        assert "policy.json" in headlines(doctor)
+        assert "claude-sb.zsh" not in headlines(doctor)
+        assert "make sandbox-install" in doctor.findings[0][2]
+
+    def test_a_file_missing_from_the_install_is_reported(self, doctor, repo_sandbox, installed):
+        # Arrange
+        self.install(repo_sandbox, installed)
+        (installed / "README.md").unlink()
+
+        # Act
+        doctor.check_sandbox()
+
+        # Assert
+        assert statuses(doctor) == [doctor.ERR]
+        assert "README.md" in headlines(doctor)

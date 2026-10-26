@@ -6,8 +6,16 @@ ECC     := .ecc
 # `make install-project` and the note in README.md.
 TARGETS ?= claude codex opencode
 
+# claude-sb (sandbox/) is copied, not linked, so an agent working here cannot change
+# its own live policy. The file list is checked against tools/doctor.py by
+# tests/test_sandbox.py; the srt version is pinned once, in the launcher.
+SANDBOX_FILES := policy.json claude-sb-run.mjs claude-sb.zsh agent-guidance.md README.md
+SANDBOX_DIR   := $(HOME)/.config/claude-sb
+SRT_VERSION   := $(shell sed -n "s/^const SRT_VERSION = '\(.*\)';/\1/p" sandbox/claude-sb-run.mjs)
+SANDBOX_LINE  := [[ -r ~/.config/claude-sb/claude-sb.zsh ]] && source ~/.config/claude-sb/claude-sb.zsh
+
 .DEFAULT_GOAL := help
-.PHONY: help setup opencode-payload install install-project reinstall plan doctor context check test conventions setup-user mcp bump uninstall update validate audit clean
+.PHONY: help setup opencode-payload install install-project reinstall plan doctor context check test conventions setup-user mcp bump uninstall update validate audit clean sandbox-install sandbox-test
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -161,3 +169,25 @@ audit: ## Scan the installed config with AgentShield (separate tool, runs locall
 
 clean: ## Remove the materialized upstream checkout
 	rm -rf $(ECC)
+
+# Run it in a normal terminal: inside claude-sb, ~/.config/claude-sb and the global
+# npm folder are not writable. Safe to run again; it only adds what is missing.
+sandbox-install: ## Install claude-sb (macOS): the pinned srt, the files in ~/.config/claude-sb, the line in ~/.zshrc
+	@[ "$$(uname)" = Darwin ] || { echo "claude-sb needs macOS"; exit 1; }
+	@[ -n "$(SRT_VERSION)" ] || { echo "no SRT_VERSION in sandbox/claude-sb-run.mjs"; exit 1; }
+	@installed=$$(srt --version 2>/dev/null | tr -d '[:space:]'); \
+		if [ "$$installed" != "$(SRT_VERSION)" ]; then \
+			echo "==> installing sandbox-runtime $(SRT_VERSION)"; \
+			npm i -g @anthropic-ai/sandbox-runtime@$(SRT_VERSION) || exit 1; fi
+	mkdir -p $(SANDBOX_DIR)
+	cp $(addprefix sandbox/,$(SANDBOX_FILES)) $(SANDBOX_DIR)/
+	@grep -qxF '$(SANDBOX_LINE)' $(HOME)/.zshrc 2>/dev/null || { \
+		echo '$(SANDBOX_LINE)' >> $(HOME)/.zshrc; echo "added the claude-sb line to ~/.zshrc"; }
+	@security find-generic-password -s claude-sb-oauth -a "$$USER" >/dev/null 2>&1 || { \
+		echo; echo "One step left, the login token (sandbox/README.md, Install):"; \
+		echo "  claude setup-token"; \
+		echo "  security add-generic-password -U -s claude-sb-oauth -a \"\$$USER\" -w"; }
+	@echo; echo "Installed. Open a new terminal, or: source ~/.config/claude-sb/claude-sb.zsh"
+
+sandbox-test: ## Probe the claude-sb policy in sandbox/ (macOS); CLAUDE_SB_TEST_REPO=<ssh url> adds git
+	sandbox/tests/run.sh sandbox/policy.json sandbox/claude-sb-run.mjs sandbox/claude-sb.zsh

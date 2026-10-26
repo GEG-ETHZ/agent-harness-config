@@ -33,7 +33,9 @@ Run `make setup-user` again after `make update`.
   conversation.
 - `claude-sb` (trial): runs Claude Code inside Anthropic's sandbox-runtime for supervised
   work, so it cannot change anything outside the project or read credentials and private
-  folders. Installed separately into `~/.config/claude-sb/`; see `sandbox/README.md`.
+  folders. Optional and macOS-only: `make sandbox-install` puts it in
+  `~/.config/claude-sb/`, `make sandbox-test` probes the policy, and `make doctor` reports
+  an installed copy that is out of date. See `sandbox/README.md`.
 
 ## [v0.2.0] — 2026-10-04
 

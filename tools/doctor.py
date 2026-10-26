@@ -86,6 +86,18 @@ STALE_CODES = ("missing-managed-files", "drifted-managed-files", "missing-source
 
 PROFILE = "custom"
 
+# claude-sb is installed by copying these files from sandbox/ to ~/.config/claude-sb/
+# (`make sandbox-install`), so that an agent working in this repo cannot change its own
+# live policy. An edit here therefore does nothing until it is installed again. Kept in
+# step with SANDBOX_FILES in the Makefile; tests/test_sandbox.py checks that.
+SANDBOX_FILES = (
+    "policy.json",
+    "claude-sb-run.mjs",
+    "claude-sb.zsh",
+    "agent-guidance.md",
+    "README.md",
+)
+
 OK, WARN, ERR = "ok", "warning", "error"
 LABEL = {OK: "  ok  ", WARN: " warn ", ERR: " fail "}
 
@@ -635,6 +647,32 @@ def check_files(report: dict | None, states: list[tuple[Path, dict]] = ()) -> No
             report_issue(adapter, issue, target, ctx, destinations)
 
 
+def sandbox_dir() -> Path:
+    """Where `make sandbox-install` puts claude-sb. A function so tests can move HOME."""
+    return Path.home() / ".config" / "claude-sb"
+
+
+def check_sandbox() -> None:
+    """Compare the installed claude-sb with sandbox/. Not installed is fine: it is optional."""
+    installed = sandbox_dir()
+    if not installed.is_dir():
+        return
+    differs = [
+        name
+        for name in SANDBOX_FILES
+        if not (installed / name).is_file()
+        or (installed / name).read_bytes() != (REPO / "sandbox" / name).read_bytes()
+    ]
+    if differs:
+        note(
+            ERR,
+            f"sandbox: the installed claude-sb differs from sandbox/ ({', '.join(differs)})",
+            "run `make sandbox-install`, then open a new terminal",
+        )
+    else:
+        note(OK, "sandbox: the installed claude-sb matches sandbox/")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--strict", action="store_true", help="exit 1 if anything is actionable")
@@ -668,6 +706,7 @@ def main() -> int:
     check_content(states)
     check_hooks(states)
     check_mcp()
+    check_sandbox()
     check_repo()
     check_files(report, states)
 

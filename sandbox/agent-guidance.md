@@ -3,8 +3,7 @@
 This session runs inside a sandbox (sandbox-runtime). It is set up for
 supervised work: a person is watching, and the sandbox stops changes outside
 this project and the use of credentials. The policy and the reason for each
-rule are in `sandbox/README.md` of the repository claude-sb was installed
-from.
+rule are in `~/.config/claude-sb/README.md`.
 
 This is not Claude Code's own Bash sandbox. That one is switched off for this
 session, so `dangerouslyDisableSandbox` and similar settings change nothing.
