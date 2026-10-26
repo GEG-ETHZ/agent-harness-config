@@ -12,9 +12,15 @@
 
 # The policy grants writes to ".", so the folder claude-sb starts in is the
 # folder the agent may change. Starting in ~ or a folder directly under it
-# (~/Documents, ~/Desktop, ~/projects) would quietly hand over all of it.
+# (~/projects) would quietly hand over all of it.
 _CLAUDE_SB_MIN_DEPTH_UNDER_HOME=2
 _CLAUDE_SB_MIN_DEPTH_OUTSIDE_HOME=3
+# Folders under ~ that policy.json closes for reading: a project there would
+# be writable but unreadable.
+_CLAUDE_SB_UNREADABLE_UNDER_HOME=(Documents Desktop Downloads Pictures Movies Music)
+# Outside ~, only these roots may hold a project. Anything else (/opt/homebrew,
+# /usr/local, /Applications) holds programs that run later, outside the sandbox.
+_CLAUDE_SB_ROOTS_OUTSIDE_HOME=(/Volumes /private/tmp)
 _CLAUDE_SB_DIR="$HOME/.config/claude-sb"
 _CLAUDE_SB_POLICY="$_CLAUDE_SB_DIR/policy.json"
 _CLAUDE_SB_RUNNER="$_CLAUDE_SB_DIR/claude-sb-run.mjs"
@@ -57,6 +63,12 @@ _CLAUDE_SB_ENV=(UV_TOOL_DIR="$HOME/.cache/claude-sb/uv-tools"
   GIT_CONFIG_KEY_2=url.https://github.com/.insteadOf GIT_CONFIG_VALUE_2=git@github.com:
   GIT_CONFIG_KEY_3=url.https://github.com/.insteadOf GIT_CONFIG_VALUE_3=ssh://git@github.com/)
 
+# With the network open, srt allows every socket, local ones included: the
+# ssh-agent would sign with your keys although ~/.ssh is closed, and a Docker
+# socket would let a container mount ~. Removing the variables stops tools
+# from finding them; it does not hide the sockets from a deliberate search.
+_CLAUDE_SB_UNSET=(SSH_AUTH_SOCK SSH_AGENT_PID DOCKER_HOST)
+
 _claude_sb_depth() {
   # Number of path components in $1 ("/a/b" -> 2).
   local -a parts
@@ -81,14 +93,29 @@ _claude_sb_check_folder() {
       print -u2 "claude-sb: ${dir/#$home/~} is a settings folder, not a project. Open a project folder first."
       return 1
     fi
+    if (( ${_CLAUDE_SB_UNREADABLE_UNDER_HOME[(Ie)${rel%%/*}]} )); then
+      print -u2 "claude-sb: ~/${rel%%/*} is closed for reading inside the sandbox, so the agent could not read this project."
+      print -u2 "  Move the project out of it, e.g. to ~/projects."
+      return 1
+    fi
     if (( $(_claude_sb_depth "/$rel") < _CLAUDE_SB_MIN_DEPTH_UNDER_HOME )); then
       print -u2 "claude-sb: ${dir/#$home/~} is too broad: it holds more than one project."
       print -u2 "  Open a single project folder first, e.g.:  cd ${dir/#$home/~}/my-project"
       return 1
     fi
-  elif (( $(_claude_sb_depth "$dir") < _CLAUDE_SB_MIN_DEPTH_OUTSIDE_HOME )); then
-    print -u2 "claude-sb: $dir is a system-level folder. Open a project folder first."
-    return 1
+  else
+    local root inside_root=0
+    for root in $_CLAUDE_SB_ROOTS_OUTSIDE_HOME; do
+      [[ $dir == $root/* ]] && inside_root=1
+    done
+    if (( ! inside_root )); then
+      print -u2 "claude-sb: $dir is a system folder. Projects outside ~ must be under: ${(j:, :)_CLAUDE_SB_ROOTS_OUTSIDE_HOME}"
+      return 1
+    fi
+    if (( $(_claude_sb_depth "$dir") < _CLAUDE_SB_MIN_DEPTH_OUTSIDE_HOME )); then
+      print -u2 "claude-sb: $dir is too broad. Open a single project folder first."
+      return 1
+    fi
   fi
   return 0
 }
@@ -129,7 +156,10 @@ claude-sb() {
   # A Seatbelt sandbox cannot start another one inside, so Claude Code's own
   # Bash sandbox is switched off for this session; srt already covers Bash.
   # Updates write outside the sandbox, so they are left to plain `claude`.
-  env $_CLAUDE_SB_ENV \
+  local -a unset_args
+  local name
+  for name in $_CLAUDE_SB_UNSET; do unset_args+=(-u $name); done
+  env $unset_args $_CLAUDE_SB_ENV \
     CLAUDE_CODE_OAUTH_TOKEN="$token" DISABLE_AUTOUPDATER=1 \
     node "$_CLAUDE_SB_RUNNER" "$srt_dist" "$_CLAUDE_SB_POLICY" -- \
     claude --permission-mode auto --settings '{"sandbox":{"enabled":false}}' \

@@ -22,8 +22,9 @@ What it blocks:
   and `CLAUDE.md` in `~/.claude`, and to `.git/hooks`, `.git/config` and
   `.vscode` in the project.
 - Reading credentials: `~/.ssh`, `~/.aws`, `~/.config/gcloud`, `~/.config/gh`,
-  `~/.gnupg`, `~/.netrc`, the Keychain, `.env` files, shell history, npm, PyPI,
-  Docker and Kubernetes logins. `gh` does not start.
+  `~/.gnupg`, `~/.netrc`, the Keychain, `.env` files, shell histories, and the
+  logins of git, package registries, containers and other tools. `gh` does not
+  start, and the ssh-agent and Docker are not available.
 - Reading private folders: Documents, Desktop, Downloads, photos, mail,
   messages, browser profiles. Ask the user to copy a file into the project.
 - Pushing code. `git fetch` and `git clone` from GitHub work, private repos

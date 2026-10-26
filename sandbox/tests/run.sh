@@ -53,8 +53,24 @@ wrapper_env() {
   zsh -c 'source "$1" && print -rl -- $_CLAUDE_SB_ENV' _ "$WRAPPER"
 }
 
+# The variables claude-sb removes (ssh-agent, Docker), as `env -u` arguments.
+wrapper_unset() {
+  zsh -c 'source "$1" && for n in $_CLAUDE_SB_UNSET; do print -rl -- -u $n; done' _ "$WRAPPER"
+}
+
+# START_FOLDER_OK PATH: does the wrapper's folder check let claude-sb start there?
+start_folder_ok() {
+  zsh -c 'source "$1" && _claude_sb_check_folder "$2"' _ "$WRAPPER" "$1" 2>/dev/null
+}
+
+expect_start() {
+  if start_folder_ok "$2"; then [[ $1 == start ]]; else [[ $1 == refuse ]]; fi \
+    && printf 'ok    start  %s %s\n' "$1" "${2/#$HOME/~}" \
+    || { printf 'FAIL  start  %s %s\n' "$1" "${2/#$HOME/~}"; core_failures=$((core_failures + 1)); }
+}
+
 sandboxed() {
-  (cd "$PROJECT" && env "${SESSION_ENV[@]}" node "$RUNNER" "$SRT_DIST" "$SETTINGS" -c "$1") 2>&1
+  (cd "$PROJECT" && env "${UNSET_ARGS[@]}" "${SESSION_ENV[@]}" node "$RUNNER" "$SRT_DIST" "$SETTINGS" -c "$1") 2>&1
 }
 
 # expect_block NAME COMMAND [CLEANUP]: COMMAND must be denied by the sandbox.
@@ -113,6 +129,8 @@ RUNNER=$(realpath "$RUNNER")
 SESSION_ENV=()
 while IFS= read -r line; do SESSION_ENV+=("$line"); done < <(wrapper_env)
 (( ${#SESSION_ENV[@]} > 0 )) || { echo "no session variables from $WRAPPER" >&2; exit 2; }
+UNSET_ARGS=()
+while IFS= read -r line; do UNSET_ARGS+=("$line"); done < <(wrapper_unset)
 SRT_DIST=$(cd "$(dirname "$(readlink -f "$(command -v srt)")")" && pwd)
 
 setup_project
@@ -146,6 +164,8 @@ expect_block_checked "read ~/Desktop"           'ls ~/Desktop'
 expect_block_checked "read Mail"                'ls ~/Library/Mail'
 expect_block_checked "read browser cookies"     'ls ~/Library/Cookies'
 expect_block_checked "read shell history"       'cat ~/.zsh_history >/dev/null'
+expect_block_checked "read Terminal session history" 'ls ~/.zsh_sessions >/dev/null'
+expect_block_checked "use the ssh-agent"        'ssh-add -l >/dev/null'
 expect_work core "npm runs (~/.npmrc closed)" 'npm config get registry >/dev/null'
 expect_block_checked "read the gh token (Keychain)" \
   'security find-generic-password -s gh:github.com -w >/dev/null'
@@ -173,6 +193,16 @@ expect_block "login item (~/Library/LaunchAgents)" 'touch ~/Library/LaunchAgents
 expect_block_checked "run sudo (setuid)"    '/usr/bin/sudo --version'
 expect_block "launch an app (open)"         'open -g -j /System/Applications/Calculator.app' \
   'osascript -e "quit app \"Calculator\"" 2>/dev/null'
+
+echo "-- claude-sb starts only in a single project folder"
+expect_start refuse "$HOME"
+expect_start refuse "$HOME/projects"
+expect_start start  "$HOME/projects/example"
+expect_start refuse "$HOME/Documents/example"
+expect_start refuse "$HOME/.config/example"
+expect_start refuse /opt/homebrew/bin
+expect_start refuse /usr/local/bin
+expect_start start  /Volumes/Disk/example
 
 echo "-- project files srt itself always protects"
 expect_block "write .git/hooks"             'touch .git/hooks/pre-commit'

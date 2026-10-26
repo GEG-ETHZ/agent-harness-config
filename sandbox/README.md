@@ -36,9 +36,12 @@ cd ~/projects/my-project
 claude-sb
 ```
 
-It refuses to start in `~`, `/`, hidden folders, `~/Library` or a folder that
-holds several projects (`~/projects`), because the agent may change everything
-in the folder it starts in.
+It starts only in a single project folder, because the agent may change
+everything in the folder it starts in. It refuses `~` and folders directly
+under it (`~/projects`), hidden folders, `~/Library`, the folders the policy
+closes for reading (`~/Documents`, `~/Desktop`, `~/Downloads`, ...), and, outside
+`~`, anything not under `/Volumes` or `/private/tmp` (`/opt/homebrew/bin` or
+`/usr/local` hold programs that run later, outside the sandbox).
 
 ## What it blocks
 
@@ -47,12 +50,16 @@ in the folder it starts in.
   `pip --user`, `uv tool install`) fail, and so do edits to your permission
   rules, hooks, rules, skills, agents and commands in `~/.claude`. Other
   projects are readable but not writable.
-- **Reading** credentials (SSH and GPG keys, cloud and GitHub CLI logins, the
-  Keychain, `.env` files, shell history, package and container logins) and
-  private folders (Documents, Desktop, Downloads, photos, mail, messages,
-  browser profiles and cookies).
+- **Reading** known credential locations (SSH and GPG keys, cloud and GitHub
+  CLI logins, the Keychain, `.env` files, shell histories, package, container
+  and other tool logins) and private folders (Documents, Desktop, Downloads,
+  photos, mail, messages, browser profiles and cookies). The list cannot be
+  complete; see Limitations.
+- **Using the ssh-agent and Docker**: their variables are removed, so `ssh`,
+  `git` and `docker` do not find them.
 - **Pushing code.** `git fetch` and `git clone` from GitHub work, private repos
-  included; `git push` does not. Push from a normal terminal.
+  included; `git push` does not, as long as the GitHub token may only read
+  code. Push from a normal terminal.
 
 The network is open, and MCP servers run with their usual tokens.
 
@@ -120,9 +127,11 @@ could use to act on other systems.
 | `~/.gnupg` | GPG keys | Sign commits or decrypt files as you. |
 | `~/.netrc` | Passwords for HTTP and FTP hosts | Read by curl, git and pip to log in. |
 | `~/Library/Keychains` | macOS Keychain | With it readable, `security` inside reads any item, the `gh` token included. |
-| `~/.zsh_history`, `~/.bash_history` | Shell history | Tokens and passwords typed into commands (`export TOKEN=...`). |
-| `~/.npmrc`, `~/.pypirc` | npm and PyPI logins | Publish packages as you. |
-| `~/.docker`, `~/.kube` | Container registry and Kubernetes logins | Push images, act on clusters. |
+| `~/.zsh_history`, `~/.zsh_sessions`, `~/.bash_history`, `~/.python_history`, `~/.node_repl_history` | Shell and REPL histories (`~/.zsh_sessions` is the per-window history of macOS Terminal) | Tokens and passwords typed into commands (`export TOKEN=...`). |
+| `~/.git-credentials`, `~/.config/git/credentials` | Passwords stored by git's `store` helper | Push to any git host. |
+| `~/.npmrc`, `~/.pypirc`, `~/.cargo/credentials*`, `~/.m2/settings.xml`, `~/.gradle/gradle.properties` | Package registry logins | Publish packages as you. Only the credential files: the rest of `~/.cargo`, `~/.m2` and `~/.gradle` holds caches the tools need. |
+| `~/.terraform.d/credentials.tfrc.json`, `~/.azure`, `~/.config/op`, `~/.config/glab-cli`, `~/.databrickscfg`, `~/.cache/huggingface/token` | Terraform Cloud, Azure, 1Password CLI, GitLab CLI, Databricks and Hugging Face logins | Act on those services as you. |
+| `~/.docker`, `~/.colima`, `~/.orbstack`, `~/.rd`, `~/.local/share/containers`, `~/.kube` | Container registry logins, the folders of Docker alternatives (Colima, OrbStack, Rancher Desktop, Podman), Kubernetes logins | Push images, act on clusters. Whether closing a folder also stops a connection to a socket inside it is not tested; the removed `DOCKER_HOST` is the main guard. |
 | `~/Library/Application Support/Slack`, `.../Microsoft/Teams`, `~/Library/Containers/com.microsoft.teams2` | Chat app data | Session cookies: read and post messages as you. |
 | `/**/.env`, `/**/.env.*` | Project secrets, in any project | API keys and passwords next to the code, `.env.local` and `.env.production` included. |
 
@@ -254,6 +263,18 @@ work or is not possible from inside one sandbox:
   OAuth logins of MCP servers are in `~/.claude/.credentials.json`, and
   `CLAUDE_CODE_OAUTH_TOKEN` is in the environment. Claude Code and the commands
   it runs share one sandbox, so anything Claude Code can read, they can.
+- **Secrets in shell startup files are readable.** `~/.zshrc`, `~/.zprofile`
+  and `~/.zshenv` stay open, because the shell inside reads them to set
+  `PATH`. Keep tokens out of them in plain text, for example by reading them
+  from the Keychain there: inside the sandbox that read fails, outside it works.
+- **Credential locations nobody listed are readable.** The `denyRead` list
+  covers known ones; a new tool's login file, or a project's own `.npmrc`,
+  `.envrc` or `*.tfvars`, is not on it.
+- **Local sockets are reachable.** With the network open, srt allows every
+  connection, local sockets included. Removing `SSH_AUTH_SOCK` and
+  `DOCKER_HOST` stops tools from finding the ssh-agent and Docker; a process
+  that searches for the sockets (the ssh-agent's is under `/private/tmp`) can
+  still connect.
 - **Data can leave.** The network is open. Even with a domain allowlist,
   `api.anthropic.com` must stay reachable, and the MCP servers can write
   wherever their tokens allow.
