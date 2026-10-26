@@ -18,8 +18,9 @@ Ask before you run anything:
    machine. Cursor and Antigravity install per project, so ask which project folders.
 2. **Do they want the Confluence, Jira and BigQuery servers, and the opt-in GitHub one?** If
    yes, they need their Confluence URL and token (and optionally Jira's) first. Ask for
-   them; never guess. Tokens go in their shell profile (`~/.bashrc` or `~/.zshrc`), URLs in
-   `.env`, copied from `.env.example`, which lists every variable `make mcp` reads.
+   them; never guess. Tokens go in the macOS Keychain, and their shell profile exports them
+   by reading them from there (README.md, *First 10 minutes*), never as plain text. URLs go
+   in `.env`, copied from `.env.example`, which lists every variable `make mcp` reads.
 
 Then run, in order: `make install`, `make setup-user`, `make doctor`, then
 `make install-project PROJECT=<path>` for each Cursor or Antigravity project, then `make mcp`

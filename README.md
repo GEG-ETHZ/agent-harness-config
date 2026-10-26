@@ -69,15 +69,30 @@ BigQuery, Miro boards, and self-hosted Jira and Confluence. A fifth, GitHub, is 
 Miro authenticates in the browser and needs nothing from you first. The others need personal
 values:
 
-- **Tokens go in your shell profile** (`~/.bashrc` or `~/.zshrc`), never in a file here.
-  `make mcp` checks they are set but does not store them; each server reads them from the
-  shell you start Claude Code in. A changed token takes effect on the next Claude Code start.
+- **Tokens go in the macOS Keychain**, never as plain text in a file: not here, and not in
+  your shell profile, which any program you run can read. The profile exports them by
+  reading the Keychain (below). `make mcp` checks they are set but does not store them;
+  each server reads them from the shell you start Claude Code in. A changed token takes
+  effect on the next Claude Code start.
 - **Everything else** (instance URLs, the GCP project) can also go in `.env`, which is
   gitignored:
 
 ```bash
 cp .env.example .env   # then fill in the values for the servers you want
 ```
+
+A token, once per token (`security` asks for the value, so it never lands in your shell
+history), and the line that exports it, in `~/.zprofile`:
+
+```bash
+security add-generic-password -a "$USER" -s confluence-token -w
+
+# ~/.zprofile — only if not set yet, so a value passed in from outside wins
+[[ -z $CONFLUENCE_TOKEN ]] && CONFLUENCE_TOKEN=$(security find-generic-password -a "$USER" -s confluence-token -w 2>/dev/null) && export CONFLUENCE_TOKEN
+```
+
+The same for `JIRA_TOKEN` and `GITHUB_PERSONAL_ACCESS_TOKEN`. On Linux, use your secret
+store the same way (`secret-tool lookup ...`).
 
 `CONFLUENCE_URL` and `CONFLUENCE_TOKEN` are required for the Atlassian server, `JIRA_URL` and
 `JIRA_TOKEN` are optional, and tokens come from each system's own profile settings. The
@@ -117,7 +132,8 @@ To switch per folder, put `export CLOUDSDK_ACTIVE_CONFIG_NAME=proj-a` in an `.en
 [direnv](https://direnv.net/).
 
 **Everything else** is an environment variable. Set it in your shell (`~/.bashrc` or
-`~/.zshrc`); the values that are not secrets can also go in `.env` here for `make mcp`:
+`~/.zshrc`), tokens read from the Keychain as above; the values that are not secrets can
+also go in `.env` here for `make mcp`:
 
 | Variable | Used by | What it is |
 | --- | --- | --- |
