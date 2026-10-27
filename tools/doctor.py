@@ -92,6 +92,7 @@ PROFILE = "custom"
 # step with SANDBOX_FILES in the Makefile; tests/test_sandbox.py checks that.
 SANDBOX_FILES = (
     "policy.json",
+    "policy.strict.json",
     "claude-sb-run.mjs",
     "claude-sb.zsh",
     "claude-sb-vscode",

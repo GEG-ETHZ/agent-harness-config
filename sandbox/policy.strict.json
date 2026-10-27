@@ -1,0 +1,82 @@
+{
+  "filesystem": {
+    "denyRead": [
+      "~",
+      "/Volumes",
+      "~/.claude/projects/*",
+      "~/.claude/.credentials.json",
+      "/**/.env",
+      "/**/.env.*"
+    ],
+    "allowRead": [
+      ".",
+      "/**/.env.example",
+      "~/.claude",
+      "~/.claude/projects/{project}",
+      "~/.claude.json",
+      "~/.claude.json.*",
+      "~/.config/claude-sb",
+      "~/.local/bin/claude",
+      "~/.local/share/claude",
+      "~/.vscode/extensions/anthropic.claude-code-*",
+      "~/.gitconfig",
+      "~/.config/git/config",
+      "~/.config/git/ignore",
+      "~/.config/git/attributes",
+      "~/Library/Preferences/.GlobalPreferences.plist",
+      "~/Library/Preferences/.GlobalPreferences_m.plist",
+      "~/Library/Preferences/ByHost/.GlobalPreferences.*.plist",
+      "~/Library/Caches/claude-cli-nodejs"
+    ],
+    "allowWrite": [
+      ".",
+      "/tmp",
+      "/private/tmp",
+      "~/.claude/projects/{project}",
+      "~/.claude/sessions",
+      "~/.claude/session-env",
+      "~/.claude/shell-snapshots",
+      "~/.claude/file-history",
+      "~/.claude/todos",
+      "~/.claude/plans",
+      "~/.claude/tasks",
+      "~/.claude/paste-cache",
+      "~/.claude/image-cache",
+      "~/.claude/cache",
+      "~/.claude/backups",
+      "~/.claude/history.jsonl",
+      "~/.claude/.last-cleanup",
+      "~/.claude/mcp-needs-auth-cache.json",
+      "~/.claude/policy-limits.json*",
+      "~/.claude/remote-settings.json*",
+      "~/.claude.json",
+      "~/.claude.json.*",
+      "~/Library/Caches/claude-cli-nodejs"
+    ],
+    "denyWrite": [
+      "~/.claude/settings.json",
+      "~/.claude/scripts"
+    ]
+  },
+  "network": {
+    "allowedDomains": [
+      "api.anthropic.com",
+      "statsig.anthropic.com",
+      "claude.ai",
+      "console.anthropic.com"
+    ],
+    "deniedDomains": [],
+    "strictAllowlist": true,
+    "deniedResolvedAddresses": [
+      "10.0.0.0/8",
+      "172.16.0.0/12",
+      "192.168.0.0/16",
+      "100.64.0.0/10",
+      "fc00::/7"
+    ],
+    "allowLocalBinding": false
+  },
+  "allowAppleEvents": false,
+  "allowPty": true,
+  "enableWeakerNetworkIsolation": false
+}

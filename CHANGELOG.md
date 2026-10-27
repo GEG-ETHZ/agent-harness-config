@@ -36,7 +36,10 @@ Run `make setup-user` again after `make update`.
   folders. Optional and macOS-only: `make sandbox-install` puts it in
   `~/.config/claude-sb/`, `make sandbox-test` probes the policy, and `make doctor` reports
   an installed copy that is out of date. Works in the VS Code extension through
-  `claudeCode.claudeProcessWrapper`. See `sandbox/README.md`.
+  `claudeCode.claudeProcessWrapper`. Two profiles: supervised (the default) and strict,
+  which closes everything in `~` and the network and opens only the exceptions you list in
+  `~/.config/claude-sb/policy.local.json` (`make sandbox-policy` shows the result). See
+  `sandbox/README.md`.
 
 ## [v0.2.0] — 2026-10-04
 

@@ -9,13 +9,13 @@ TARGETS ?= claude codex opencode
 # claude-sb (sandbox/) is copied, not linked, so an agent working here cannot change
 # its own live policy. The file list is checked against tools/doctor.py by
 # tests/test_sandbox.py; the srt version is pinned once, in the launcher.
-SANDBOX_FILES := policy.json claude-sb-run.mjs claude-sb.zsh claude-sb-vscode agent-guidance.md README.md
+SANDBOX_FILES := policy.json policy.strict.json claude-sb-run.mjs claude-sb.zsh claude-sb-vscode agent-guidance.md README.md
 SANDBOX_DIR   := $(HOME)/.config/claude-sb
 SRT_VERSION   := $(shell sed -n "s/^const SRT_VERSION = '\(.*\)';/\1/p" sandbox/claude-sb-run.mjs)
 SANDBOX_LINE  := [[ -r ~/.config/claude-sb/claude-sb.zsh ]] && source ~/.config/claude-sb/claude-sb.zsh
 
 .DEFAULT_GOAL := help
-.PHONY: help setup opencode-payload install install-project reinstall plan doctor context check test conventions setup-user mcp bump uninstall update validate audit clean sandbox-install sandbox-test
+.PHONY: help setup opencode-payload install install-project reinstall plan doctor context check test conventions setup-user mcp bump uninstall update validate audit clean sandbox-install sandbox-test sandbox-policy
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -191,3 +191,6 @@ sandbox-install: ## Install claude-sb (macOS): the pinned srt, the files in ~/.c
 
 sandbox-test: ## Probe the claude-sb policy in sandbox/ (macOS); CLAUDE_SB_TEST_REPO=<ssh url> adds git
 	sandbox/tests/run.sh sandbox/policy.json sandbox/claude-sb-run.mjs sandbox/claude-sb.zsh
+
+sandbox-policy: ## Show the policy claude-sb runs with: sandbox/policy.json plus your policy.local.json
+	@node sandbox/claude-sb-run.mjs --print sandbox/policy.json --local $(SANDBOX_DIR)/policy.local.json

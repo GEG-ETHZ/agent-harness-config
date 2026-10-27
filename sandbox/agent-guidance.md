@@ -26,10 +26,16 @@ What it blocks:
   start, and the ssh-agent and Docker are not available.
 - Reading private folders: Documents, Desktop, Downloads, photos, mail,
   messages, browser profiles. Ask the user to copy a file into the project.
+- In the strict profile (the start line names it), everything in `~` outside
+  the project and Claude Code's own files is closed, and so is every host but
+  Anthropic's. A tool, cache or host that fails there needs an exception the
+  user adds to their own policy; say which path or host, do not look for
+  another way.
 - Pushing code. `git fetch` and `git clone` from GitHub work, private repos
   included, with a token that may read code only; GitHub refuses `git push`.
 
-The network is open, and MCP servers have their usual tokens. For pull
+The network is open unless the user's own policy filters it (the start line
+says which), and MCP servers have their usual tokens. For pull
 requests, issues and comments, use the GitHub MCP tools.
 
 ## When something is blocked

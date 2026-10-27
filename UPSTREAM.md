@@ -530,12 +530,22 @@ What the code relies on, as of 0.0.79:
 - **The `srt` command always filters the network.** Its settings file requires
   `network.allowedDomains`, and that list accepts no `*`. The library filters only when the
   list is given, so `claude-sb-run.mjs` starts the sandbox through the library, after checking
-  the policy with srt's own `SandboxRuntimeConfigSchema`. It imports only the package's entry
+  the policy with srt's own `SandboxRuntimeConfigSchema`. A personal `policy.local.json` with
+  a `network` block is passed on as it is, and then srt filters: only `allowedDomains`, and no
+  local sockets unless `allowUnixSockets` names them. It imports only the package's entry
   point (`dist/index.js`); shell quoting is the launcher's own.
 - **Without a network block, every socket is allowed**, local ones included: the macOS profile
   gets `(allow network*)` (`dist/sandbox/macos-sandbox-utils.js`). The ssh-agent and Docker
   sockets are therefore reachable; the wrapper removes `SSH_AUTH_SOCK`, `SSH_AGENT_PID` and
   `DOCKER_HOST` so tools do not find them.
+- **The more specific read rule wins.** A `denyRead` entry inside an `allowRead` region stays
+  closed (`**/.env` under `.`), and an `allowRead` reopens only inside a broader `denyRead`.
+  A personal policy on the strict profile uses it to keep a credential folder closed inside
+  a parent folder it reopens (`~/.config/gh` under `~/.config`). Only two levels work: a
+  literal `denyRead` inside an `allowRead` is re-emitted after every allow
+  (`lateReadDenyFilters` in `dist/sandbox/macos-sandbox-utils.js`), so a third, deeper
+  `allowRead` cannot reopen part of it. A glob `denyRead` is re-emitted minus the allows it
+  covers, which is why strict closes `~/.claude/projects/*` and not `~/.claude/projects`.
 - **Some paths are never writable** in the project, whatever the policy says: `.git/hooks`,
   `.git/config`, `.vscode`, `.idea`, `.claude/commands`, `.claude/agents`, `.mcp.json` and the
   shell start-up files. Tools that open every file for writing, such as pre-commit's

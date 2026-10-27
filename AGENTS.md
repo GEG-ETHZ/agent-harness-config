@@ -68,6 +68,7 @@ make validate    # check the pin, the overlay and custom/ are consistent
 make clean       # remove the materialized .ecc/ checkout
 make sandbox-install  # install claude-sb, Claude Code in an OS sandbox (macOS, optional)
 make sandbox-test     # probe the claude-sb policy in sandbox/ (macOS)
+make sandbox-policy   # the policy claude-sb runs with, your policy.local.json merged in
 ```
 
 `make install` is reversible: ECC records every file it writes in an install-state file, and

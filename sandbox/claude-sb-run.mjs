@@ -1,35 +1,63 @@
-// Run a command under sandbox-runtime's file rules with the network open.
+// Run a command under sandbox-runtime with claude-sb's policy.
 //
-// Usage: node claude-sb-run.mjs SRT_DIST POLICY -c 'command string'
-//        node claude-sb-run.mjs SRT_DIST POLICY -- command [args...]
+// Usage: node claude-sb-run.mjs SRT_DIST POLICY [--local LOCAL] -c 'command string'
+//        node claude-sb-run.mjs SRT_DIST POLICY [--local LOCAL] -- command [args...]
+//        node claude-sb-run.mjs --print POLICY [--local LOCAL]
+//
+// POLICY is the shared, supervised policy; policy.strict.json next to it is
+// the strict one. LOCAL, if given, is your personal file: its "extends" picks
+// the profile ("supervised", the default, or "strict"), and everything else in
+// it is merged over that profile (see mergePolicy). {project} in a path
+// stands for the current project's folder in ~/.claude/projects. --print
+// shows the result and needs no srt.
 //
 // The srt CLI always filters the network: its settings file requires
 // network.allowedDomains, and that list accepts no bare "*". The library only
-// filters when allowedDomains is set, so this launcher validates the policy
-// with srt's own schema and then starts the sandbox without that list.
-// Everything else follows srt's cli.js: quoting, signal forwarding, exit codes.
+// filters when allowedDomains is set, so this launcher starts the sandbox
+// through the library: with the network open when the merged policy has no
+// "network" block, and filtered to its allowedDomains when it has one. Either
+// way the policy is validated with srt's own schema first. Everything else
+// follows srt's cli.js: signal forwarding, exit codes.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // The one place the srt version is pinned. The Makefile installs it, and the
 // launcher refuses any other: it relies on how this version builds the
 // sandbox and handles a policy without a network block.
 const SRT_VERSION = '0.0.79';
-const USAGE = "usage: claude-sb-run.mjs SRT_DIST POLICY (-c 'command' | -- command [args...])";
+const USAGE = [
+  "usage: claude-sb-run.mjs SRT_DIST POLICY [--local LOCAL] (-c 'command' | -- command [args...])",
+  '       claude-sb-run.mjs --print POLICY [--local LOCAL]',
+].join('\n');
 
 function fail(message) {
   console.error(`claude-sb-run: ${message}`);
   process.exit(2);
 }
 
+function takeLocal(rest) {
+  if (rest[0] !== '--local') return { localPath: undefined, rest };
+  if (!rest[1]) fail(USAGE);
+  return { localPath: rest[1], rest: rest.slice(2) };
+}
+
 function parseArgs(argv) {
-  const [srtDist, policyPath, mode, ...rest] = argv;
+  if (argv[0] === '--print') {
+    const [, policyPath, ...more] = argv;
+    if (!policyPath) fail(USAGE);
+    const { localPath, rest } = takeLocal(more);
+    if (rest.length > 0) fail(USAGE);
+    return { print: true, policyPath, localPath };
+  }
+  const [srtDist, policyPath, ...more] = argv;
   if (!srtDist || !policyPath) fail(USAGE);
-  if (mode === '-c' && rest.length === 1) return { srtDist, policyPath, commandString: rest[0] };
-  if (mode === '--' && rest.length > 0) return { srtDist, policyPath, commandArgs: rest };
+  const { localPath, rest } = takeLocal(more);
+  const [mode, ...command] = rest;
+  if (mode === '-c' && command.length === 1) return { srtDist, policyPath, localPath, commandString: command[0] };
+  if (mode === '--' && command.length > 0) return { srtDist, policyPath, localPath, commandArgs: command };
   return fail(USAGE);
 }
 
@@ -53,35 +81,89 @@ function shellQuote(args) {
     .join(' ');
 }
 
-function loadPolicy(policyPath, SandboxRuntimeConfigSchema) {
-  let raw;
+function readJson(path, what) {
   try {
-    raw = JSON.parse(readFileSync(policyPath, 'utf8'));
+    return JSON.parse(readFileSync(path, 'utf8'));
   } catch (error) {
-    return fail(`cannot read the policy ${policyPath}: ${error.message}`);
+    return fail(`cannot read the ${what} ${path}: ${error.message}`);
   }
-  if (raw.network !== undefined) {
-    fail(`${policyPath} has a "network" block; this launcher runs with the network open. Remove it.`);
+}
+
+const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+// The personal policy only adds: lists are extended (entries already there
+// are not repeated), objects are merged key by key, and a single value
+// (true/false, a number) replaces the shared one. Nothing in the shared
+// policy can be removed this way, so stricter means adding entries.
+export function mergePolicy(shared, local) {
+  if (Array.isArray(shared) && Array.isArray(local)) {
+    return [...shared, ...local.filter((entry) => !shared.includes(entry))];
   }
-  // srt's schema requires a network block; an empty one is enough to check
-  // the rest of the file, and is dropped again below.
-  const result = SandboxRuntimeConfigSchema.safeParse({
-    ...raw,
-    network: { allowedDomains: [], deniedDomains: [] },
-  });
-  if (!result.success) {
-    fail(`${policyPath} is not a valid srt policy: ${result.error.message}`);
+  if (isObject(shared) && isObject(local)) {
+    const merged = { ...shared };
+    for (const [key, value] of Object.entries(local)) {
+      merged[key] = key in shared ? mergePolicy(shared[key], value) : value;
+    }
+    return merged;
   }
-  // No allowedDomains: srt starts no proxy and adds no network rule.
-  return { ...result.data, network: { deniedDomains: [] } };
+  return local === undefined ? shared : local;
+}
+
+// Claude Code keeps a project's transcripts and memory in
+// ~/.claude/projects/<key>, the key being the project's path with every
+// character other than a letter or digit replaced by "-". A policy names that
+// folder as {project}, so it can open the current project's and no other.
+export const projectKey = (dir) => dir.replace(/[^A-Za-z0-9]/g, '-');
+
+function withProject(value, key) {
+  if (typeof value === 'string') return value.replaceAll('{project}', key);
+  if (Array.isArray(value)) return value.map((entry) => withProject(entry, key));
+  if (isObject(value)) {
+    return Object.fromEntries(Object.entries(value).map(([name, entry]) => [name, withProject(entry, key)]));
+  }
+  return value;
+}
+
+// Profiles a personal file can extend. supervised: open network, reads closed
+// only where listed. strict: everything in ~ closed, network filtered, and the
+// personal file adds the exceptions.
+const PROFILES = { supervised: (policyPath) => policyPath, strict: (policyPath) => join(dirname(policyPath), 'policy.strict.json') };
+
+function effectivePolicy(policyPath, localPath) {
+  const personal = localPath && existsSync(localPath) ? readJson(localPath, 'personal policy') : {};
+  const { extends: profile = 'supervised', ...additions } = personal;
+  if (!(profile in PROFILES)) {
+    fail(`"extends": "${profile}" in ${localPath}: use one of ${Object.keys(PROFILES).join(', ')}`);
+  }
+  const merged = mergePolicy(readJson(PROFILES[profile](policyPath), `${profile} policy`), additions);
+  return withProject(merged, projectKey(process.cwd()));
+}
+
+function validate(policy, SandboxRuntimeConfigSchema) {
+  // srt's schema requires a network block with both lists. Without one the
+  // network stays open: an empty block is enough to check the rest, and no
+  // allowedDomains means srt starts no proxy and adds no network rule.
+  const filtered = policy.network !== undefined;
+  const network = filtered
+    ? { deniedDomains: [], ...policy.network }
+    : { allowedDomains: [], deniedDomains: [] };
+  const result = SandboxRuntimeConfigSchema.safeParse({ ...policy, network });
+  if (!result.success) fail(`the policy is not valid for srt: ${result.error.message}`);
+  return filtered ? result.data : { ...result.data, network: { deniedDomains: [] } };
 }
 
 async function main() {
-  const { srtDist, policyPath, commandString, commandArgs } = parseArgs(process.argv.slice(2));
-  checkSrtVersion(srtDist);
+  const args = parseArgs(process.argv.slice(2));
+  const policy = effectivePolicy(args.policyPath, args.localPath);
+  if (args.print) {
+    console.log(JSON.stringify(policy, null, 2));
+    return;
+  }
+
+  checkSrtVersion(args.srtDist);
   // index.js is the package's entry point ("main"), not an internal file.
   const { SandboxManager, SandboxRuntimeConfigSchema } = await import(
-    pathToFileURL(join(srtDist, 'index.js')).href
+    pathToFileURL(join(args.srtDist, 'index.js')).href
   );
 
   // Registered before anything slow, so Ctrl+C while the sandbox is being
@@ -91,10 +173,9 @@ async function main() {
   process.on('SIGINT', () => forward('SIGINT'));
   process.on('SIGTERM', () => forward('SIGTERM'));
 
-  const policy = loadPolicy(policyPath, SandboxRuntimeConfigSchema);
-  await SandboxManager.initialize(policy);
+  await SandboxManager.initialize(validate(policy, SandboxRuntimeConfigSchema));
 
-  const command = commandString ?? shellQuote(commandArgs);
+  const command = args.commandString ?? shellQuote(args.commandArgs);
   const sandboxed = await SandboxManager.wrapWithSandbox(command);
   child = spawn(sandboxed, { shell: true, stdio: 'inherit' });
 
@@ -110,4 +191,7 @@ async function main() {
   child.on('error', (error) => fail(`cannot start the command: ${error.message}`));
 }
 
-main().catch((error) => fail(error instanceof Error ? error.message : String(error)));
+// Run only as a program; importing the module (for mergePolicy) starts nothing.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => fail(error instanceof Error ? error.message : String(error)));
+}

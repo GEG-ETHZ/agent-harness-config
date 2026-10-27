@@ -271,10 +271,12 @@ credentials. It is not part of `make install`:
 ```bash
 make sandbox-install   # the pinned sandbox-runtime, ~/.config/claude-sb/, a line in ~/.zshrc
 make sandbox-test      # probe the policy
+make sandbox-policy    # the policy it runs with, your own additions merged in
 ```
 
-It works in the terminal and in the VS Code extension. What it blocks, what it does not,
-and the login token it needs: `sandbox/README.md`.
+It works in the terminal and in the VS Code extension. A strict profile closes everything
+and opens only the exceptions you list in `~/.config/claude-sb/policy.local.json`. What it blocks, what it does not, and the
+login token it needs: `sandbox/README.md`.
 `make doctor` reports an installed copy that is older than `sandbox/`.
 
 ### Cursor and Antigravity are project-scoped

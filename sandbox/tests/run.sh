@@ -5,6 +5,11 @@
 #        (defaults: the installed copies in ~/.config/claude-sb/)
 #        CLAUDE_SB_TEST_REPO=git@github.com:owner/private-repo.git also probes
 #        git fetch and push.
+#        Your personal policy (~/.config/claude-sb/policy.local.json, or
+#        CLAUDE_SB_LOCAL_POLICY) is merged in, as claude-sb does; with a network
+#        block in it, hosts outside its allowedDomains must be blocked. With
+#        "extends": "strict", the work that needs an exception of your own
+#        (other projects, uv, npm, GitHub) is only reported, as "info".
 #
 # Each probe runs through claude-sb-run.mjs, the way claude-sb starts Claude,
 # from a throwaway project that stands in for "the project". The script exits
@@ -28,11 +33,14 @@ set -uo pipefail
 SETTINGS=${1:-$HOME/.config/claude-sb/policy.json}
 RUNNER=${2:-$HOME/.config/claude-sb/claude-sb-run.mjs}
 WRAPPER=${3:-$HOME/.config/claude-sb/claude-sb.zsh}
+LOCAL_POLICY=${CLAUDE_SB_LOCAL_POLICY:-$HOME/.config/claude-sb/policy.local.json}
 NETWORK_TIMEOUT_SECONDS=5
 # A private repo the GitHub MCP token can read, as an SSH URL
 # (git@github.com:owner/repo.git); fetch and push are probed on it.
 PRIVATE_REPO=${CLAUDE_SB_TEST_REPO:-}
 SANDBOX_DENIAL='Operation not permitted'
+# With a network filter, srt's proxy refuses a host outside allowedDomains.
+PROXY_DENIAL='response 403|Operation not permitted|Could not resolve|Failed to connect'
 # Launching an app fails with a Launch Services error code instead.
 LAUNCH_DENIAL='Operation not permitted|-54|-10822|-600|cannot be opened'
 # git push is refused by GitHub, not by the sandbox.
@@ -55,6 +63,8 @@ setup_project() {
   PROBE_ROOT=$(mktemp -d "$HOME/.claude-sb-test.XXXXXX") || exit 2
   PROJECT="$PROBE_ROOT/project"
   OTHER_PROJECT="$PROBE_ROOT/other-project"
+  # The test project's folder in ~/.claude/projects, named as Claude Code does.
+  PROJECT_KEY=$(printf '%s' "$PROJECT" | sed 's/[^A-Za-z0-9]/-/g')
   mkdir -p "$PROJECT/.claude" "$OTHER_PROJECT"
   git -C "$PROJECT" init -q
   printf 'SECRET=probe\n' > "$PROJECT/.env"
@@ -82,7 +92,8 @@ start_folder_ok() {
 }
 
 sandboxed() {
-  (cd "$PROJECT" && env "${UNSET_ARGS[@]}" "${SESSION_ENV[@]}" node "$RUNNER" "$SRT_DIST" "$SETTINGS" -c "$1") 2>&1
+  (cd "$PROJECT" && env "${UNSET_ARGS[@]}" "${SESSION_ENV[@]}" \
+    node "$RUNNER" "$SRT_DIST" "$SETTINGS" ${LOCAL_ARGS[@]+"${LOCAL_ARGS[@]}"} -c "$1") 2>&1
 }
 
 # expect_block NAME COMMAND [CLEANUP]: COMMAND must be denied by the sandbox.
@@ -125,6 +136,19 @@ expect_work() {
   fi
 }
 
+# expect_profile_work NAME COMMAND: normal work the supervised profile allows,
+# and the strict one only with an exception of your own. Must work in the
+# supervised profile; in the strict one, reported as info either way.
+expect_profile_work() {
+  if [[ $PROFILE != strict ]]; then
+    expect_work core "$1" "$2"
+  elif sandboxed "$2" >/dev/null; then
+    printf 'info  works  %s\n' "$1"
+  else
+    printf 'info  closed %s (add an exception if you need it)\n' "$1"
+  fi
+}
+
 # expect_start start|refuse PATH: the wrapper's folder check.
 expect_start() {
   local result=refuse
@@ -139,6 +163,26 @@ expect_start() {
 
 reachable() {
   printf 'curl -sS -o /dev/null -m %s %s' "$NETWORK_TIMEOUT_SECONDS" "$1"
+}
+
+# host_allowed HOST: is HOST in the effective policy's allowedDomains
+# (exact, or under a "*." pattern)? Only asked when the network is filtered.
+host_allowed() {
+  node -e '
+    const [policy, host] = [JSON.parse(process.argv[1]), process.argv[2]];
+    const allowed = (policy.network.allowedDomains || []).map((d) => d.replace(/:\d+$/, ""));
+    const ok = allowed.some((d) => d === host || (d.startsWith("*.") && host.endsWith(d.slice(1))));
+    process.exit(ok ? 0 : 1);' "$EFFECTIVE" "$1"
+}
+
+# expect_host NAME HOST URL: reachable with the network open, or when the
+# filter allows HOST; blocked when the filter does not.
+expect_host() {
+  if [[ $NETWORK != filtered ]] || host_allowed "$2"; then
+    expect_work core "$1" "$(reachable "$3")"
+  else
+    DENIAL=$PROXY_DENIAL expect_block "$1 (not in allowedDomains)" "$(reachable "$3")"
+  fi
 }
 
 if ! command -v srt >/dev/null 2>&1; then
@@ -158,9 +202,22 @@ while IFS= read -r line; do SESSION_ENV+=("$line"); done < <(wrapper_env)
 UNSET_ARGS=()
 while IFS= read -r line; do UNSET_ARGS+=("$line"); done < <(wrapper_unset)
 SRT_DIST=$(cd "$(dirname "$(readlink -f "$(command -v srt)")")" && pwd)
+LOCAL_ARGS=()
+[[ -r $LOCAL_POLICY ]] && LOCAL_ARGS=(--local "$(realpath "$LOCAL_POLICY")")
+EFFECTIVE=$(node "$RUNNER" --print "$SETTINGS" ${LOCAL_ARGS[@]+"${LOCAL_ARGS[@]}"}) || exit 2
+PROFILE=supervised
+if (( ${#LOCAL_ARGS[@]} > 0 )); then
+  PROFILE=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).extends || "supervised")' \
+    "${LOCAL_ARGS[1]}") || exit 2
+fi
+NETWORK=open
+grep -q '"network"' <<<"$EFFECTIVE" && NETWORK=filtered
 
 setup_project
 echo "policy: $SETTINGS"
+echo "personal policy: ${LOCAL_ARGS[1]:-none}"
+echo "profile: $PROFILE"
+echo "network: $NETWORK"
 echo "launcher: $RUNNER"
 echo "project: $PROJECT"
 
@@ -176,7 +233,7 @@ echo
 echo "-- credentials and private folders are unreadable"
 # The Keychain probes only count if `security` runs inside at all. gh does
 # not start inside by design (~/.config/gh is closed), so its probe needs none.
-expect_work core "security runs inside"        'security list-keychains >/dev/null'
+expect_profile_work "security runs inside"   'security list-keychains >/dev/null'
 expect_block_checked "read ~/.ssh"              'ls ~/.ssh'
 expect_block_checked "read ~/.config/gcloud"    'ls ~/.config/gcloud'
 expect_block_checked "read ~/.aws"              'ls ~/.aws'
@@ -198,7 +255,7 @@ expect_block_checked "read ~/Desktop"           'ls ~/Desktop'
 expect_block_checked "read Mail"                'ls ~/Library/Mail'
 expect_block_checked "read browser cookies"     'ls ~/Library/Cookies'
 expect_block_checked "use the ssh-agent"        'ssh-add -l >/dev/null'
-expect_work core "npm runs (~/.npmrc closed)" 'npm config get registry >/dev/null'
+expect_profile_work "npm runs (~/.npmrc closed)" 'npm config get registry >/dev/null'
 expect_block_checked "read the gh token (Keychain)" \
   'security find-generic-password -s gh:github.com -w >/dev/null'
 expect_block_checked "read Claude's login (Keychain)" \
@@ -231,6 +288,20 @@ DENIAL=$LAUNCH_DENIAL expect_block "launch an app (open)" \
   'open -g -j /System/Applications/Calculator.app' \
   'osascript -e "quit app \"Calculator\"" 2>/dev/null'
 
+if [[ $PROFILE == strict ]]; then
+  echo "-- strict: ~ is closed, the caches and other projects' Claude state too"
+  expect_block_checked "read a folder in ~ not reopened" "ls $PROBE_ROOT"
+  expect_block "write a cache (~/.cache)"   'mkdir -p ~/.cache/srt-probe' 'rmdir ~/.cache/srt-probe'
+  expect_block "write the npm cache"       'mkdir -p ~/.npm/srt-probe' 'rmdir ~/.npm/srt-probe'
+  expect_block_checked "read the shell startup files" 'cat ~/.zprofile ~/.zshrc'
+  expect_block_checked "read other projects' Claude transcripts" 'ls ~/.claude/projects/*/'
+  expect_block "write another project's Claude memory" \
+    'mkdir -p ~/.claude/projects/srt-probe' 'rmdir ~/.claude/projects/srt-probe'
+  expect_block "install a Claude plugin"   'mkdir -p ~/.claude/plugins/srt-probe' \
+    'rmdir ~/.claude/plugins/srt-probe'
+  expect_block_checked "read Claude's login file" 'cat ~/.claude/.credentials.json'
+fi
+
 echo "-- claude-sb starts only in a single project folder"
 expect_start refuse "$HOME"
 expect_start refuse "$HOME/projects"
@@ -254,17 +325,17 @@ expect_work core "write AGENTS.md / CLAUDE.md" 'echo x > AGENTS.md && echo x > C
 expect_work core "write .claude/settings.json" 'echo "{}" > .claude/settings.json'
 expect_work core "write .github/workflows"     'mkdir -p .github/workflows'
 expect_work core "write Claude history"        ': >> ~/.claude/history.jsonl'
-expect_work core "write Claude memory"         'mkdir -p ~/.claude/projects/srt-probe/memory && touch ~/.claude/projects/srt-probe/memory/x && rm -rf ~/.claude/projects/srt-probe'
-expect_work core "read another project"        "cat $OTHER_PROJECT/README.md"
-expect_work core "uv run in project"           'uv run --no-project python3 main.py'
-expect_work core "Anthropic API reachable"     "$(reachable https://api.anthropic.com)"
-expect_work core "any website reachable"       "$(reachable https://example.com)"
-expect_work core "GitHub API reachable"        "$(reachable https://api.github.com)"
-expect_work core "PyPI reachable"              "$(reachable https://pypi.org/simple/)"
-expect_work core "npm registry reachable"      "$(reachable https://registry.npmjs.org/)"
+expect_work core "write Claude memory"         "mkdir -p ~/.claude/projects/$PROJECT_KEY/memory && touch ~/.claude/projects/$PROJECT_KEY/memory/x && rm -rf ~/.claude/projects/$PROJECT_KEY"
+expect_profile_work "read another project"   "cat $OTHER_PROJECT/README.md"
+expect_profile_work "uv run in project"      'uv run --no-project python3 main.py'
+expect_host "Anthropic API reachable"  api.anthropic.com    https://api.anthropic.com
+expect_host "any website reachable"    example.com          https://example.com
+expect_host "GitHub API reachable"     api.github.com       https://api.github.com
+expect_host "PyPI reachable"           pypi.org             https://pypi.org/simple/
+expect_host "npm registry reachable"   registry.npmjs.org   https://registry.npmjs.org/
 # Go checks TLS through trustd, not a CA file like curl. A dummy token gets a
 # 401 from GitHub, which needs a verified TLS connection first.
-expect_work core "Go TLS (gh api, GitHub MCP)" \
+expect_profile_work "Go TLS (gh api, GitHub MCP)" \
   'GH_CONFIG_DIR=/tmp/claude-sb-gh GH_TOKEN=dummy gh api /zen 2>&1 | grep -q "Bad credentials"'
 
 echo "-- GitHub through git (the MCP token: read code, never write)"
@@ -273,8 +344,8 @@ if [[ -z ${GITHUB_PERSONAL_ACCESS_TOKEN:-} || -z $PRIVATE_REPO ]]; then
   skipped=$((skipped + 1))
   untested+=("git push is refused")
 else
-  expect_work core "git fetch a private repo (SSH URL)" "git ls-remote $PRIVATE_REPO HEAD >/dev/null"
-  DENIAL=$PUSH_DENIAL expect_block "git push (token must not write code)" \
+  expect_profile_work "git fetch a private repo (SSH URL)" "git ls-remote $PRIVATE_REPO HEAD >/dev/null"
+  DENIAL="$PUSH_DENIAL|$PROXY_DENIAL" expect_block "git push (token must not write code)" \
     "git push --dry-run $PRIVATE_REPO HEAD:refs/heads/claude-sb-probe"
 fi
 

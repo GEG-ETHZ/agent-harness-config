@@ -23,6 +23,9 @@ _CLAUDE_SB_UNREADABLE_UNDER_HOME=(Documents Desktop Downloads Pictures Movies Mu
 _CLAUDE_SB_ROOTS_OUTSIDE_HOME=(/Volumes /private/tmp)
 _CLAUDE_SB_DIR="$HOME/.config/claude-sb"
 _CLAUDE_SB_POLICY="$_CLAUDE_SB_DIR/policy.json"
+# Your own additions, merged over policy.json by the launcher (see README.md,
+# "Add exceptions"). Optional; never copied from the repo.
+_CLAUDE_SB_LOCAL_POLICY="$_CLAUDE_SB_DIR/policy.local.json"
 _CLAUDE_SB_RUNNER="$_CLAUDE_SB_DIR/claude-sb-run.mjs"
 # Tells the agent what the sandbox blocks and what to do instead of working
 # around a block; passed only to sandboxed sessions, so plain claude pays no
@@ -146,13 +149,13 @@ _claude_sb_launch() {
   # push works from inside, and so does everything else the token allows.
   if [[ ${GITHUB_PERSONAL_ACCESS_TOKEN:-} == ghp_* ]]; then
     print -u2 "claude-sb: GITHUB_PERSONAL_ACCESS_TOKEN is a classic token, which can push code."
-    print -u2 "  Use a fine-grained token with Contents: read (see sandbox/README.md, git and GitHub)."
+    print -u2 "  Use a fine-grained token with Contents: read (see sandbox/README.md, Set up)."
     return 1
   fi
   local file
   for file in $_CLAUDE_SB_POLICY $_CLAUDE_SB_RUNNER $_CLAUDE_SB_GUIDANCE; do
     if [[ ! -r $file ]]; then
-      print -u2 "claude-sb: missing ${file/#$HOME/~} (see sandbox/README.md, Install)"
+      print -u2 "claude-sb: missing ${file/#$HOME/~} (see sandbox/README.md, Set up)"
       return 1
     fi
   done
@@ -165,7 +168,18 @@ _claude_sb_launch() {
   local token
   token=$(_claude_sb_token) || return 1
 
-  print -u2 "sandboxed: writes -> ${project/#${HOME:A}/~}, network -> open (exit and run 'claude' for unsandboxed work)"
+  local -a local_args
+  local profile=supervised network=open
+  if [[ -r $_CLAUDE_SB_LOCAL_POLICY ]]; then
+    local_args=(--local "$_CLAUDE_SB_LOCAL_POLICY")
+    profile=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).extends || "supervised")' \
+      "$_CLAUDE_SB_LOCAL_POLICY" 2>/dev/null) || profile="invalid policy.local.json"
+    profile+=" + policy.local.json"
+  fi
+  node "$_CLAUDE_SB_RUNNER" --print "$_CLAUDE_SB_POLICY" $local_args 2>/dev/null | grep -q '"network"' \
+    && network=filtered
+
+  print -u2 "sandboxed ($profile): writes -> ${project/#${HOME:A}/~}, network -> $network"
 
   # A Seatbelt sandbox cannot start another one inside, so Claude Code's own
   # Bash sandbox is switched off for this session; srt already covers Bash.
@@ -178,7 +192,7 @@ _claude_sb_launch() {
   fi
   env $unset_args $_CLAUDE_SB_ENV \
     CLAUDE_CODE_OAUTH_TOKEN="$token" DISABLE_AUTOUPDATER=1 \
-    node "$_CLAUDE_SB_RUNNER" "$srt_dist" "$_CLAUDE_SB_POLICY" -- \
+    node "$_CLAUDE_SB_RUNNER" "$srt_dist" "$_CLAUDE_SB_POLICY" $local_args -- \
     $claude_cmd $session_args "$@"
 }
 
