@@ -129,7 +129,15 @@ _claude_sb_token() {
   return 1
 }
 
-claude-sb() {
+# _claude_sb_launch CLAUDE [ARGS...]: start CLAUDE (a command, as quoted words)
+# inside the sandbox with ARGS. A session also gets the flags every sandboxed
+# session needs; a subcommand (`auth status`, `mcp list`: ARGS starting with a
+# word, not an option) runs in the sandbox as it is, since it accepts none of
+# them. Shared by claude-sb (terminal) and claude-sb-vscode (VS Code).
+_claude_sb_launch() {
+  # (z) splits into shell words, (Q) removes the quoting ${(q)...} added.
+  local -a claude_cmd=("${(@Q)${(z)1}}")
+  shift
   if ! command -v srt >/dev/null 2>&1; then
     print -u2 "claude-sb: srt not found. In agent-harness-config, run: make sandbox-install"
     return 1
@@ -162,12 +170,41 @@ claude-sb() {
   # A Seatbelt sandbox cannot start another one inside, so Claude Code's own
   # Bash sandbox is switched off for this session; srt already covers Bash.
   # Updates write outside the sandbox, so they are left to plain `claude`.
-  local -a unset_args
+  local -a unset_args session_args
   local name
   for name in $_CLAUDE_SB_UNSET; do unset_args+=(-u $name); done
+  if [[ $# -eq 0 || $1 == -* ]]; then
+    session_args=(--settings '{"sandbox":{"enabled":false}}' --append-system-prompt-file "$_CLAUDE_SB_GUIDANCE")
+  fi
   env $unset_args $_CLAUDE_SB_ENV \
     CLAUDE_CODE_OAUTH_TOKEN="$token" DISABLE_AUTOUPDATER=1 \
     node "$_CLAUDE_SB_RUNNER" "$srt_dist" "$_CLAUDE_SB_POLICY" -- \
-    claude --permission-mode auto --settings '{"sandbox":{"enabled":false}}' \
-    --append-system-prompt-file "$_CLAUDE_SB_GUIDANCE" "$@"
+    $claude_cmd $session_args "$@"
+}
+
+claude-sb() {
+  if [[ $# -gt 0 && $1 != -* ]]; then
+    _claude_sb_launch claude "$@"
+  else
+    _claude_sb_launch claude --permission-mode auto "$@"
+  fi
+}
+
+# The VS Code extension runs claudeCode.claudeProcessWrapper with the path of
+# the CLI it bundles as the first argument, followed by its own arguments,
+# --permission-mode among them, so none is added here (seen with extension
+# 2.1.310; not documented, CLAUDE_SB_DEBUG=1 logs what arrives).
+claude-sb-vscode() {
+  local claude=claude
+  if [[ -n ${1:-} && -f $1 && ${1:t} == claude* ]]; then
+    claude=${(q)1}
+    shift
+  elif [[ -n ${1:-} && -f $1 && $1 == *.js ]]; then
+    claude="node ${(q)1}"
+    shift
+  fi
+  if [[ -n ${CLAUDE_SB_DEBUG:-} ]]; then
+    print -r -- "$(date '+%F %T') cwd=$PWD claude=$claude args=${(q-)@}" >> "${TMPDIR:-/tmp}/claude-sb-vscode.log"
+  fi
+  _claude_sb_launch "$claude" "$@"
 }

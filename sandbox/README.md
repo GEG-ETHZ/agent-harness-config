@@ -43,6 +43,39 @@ closes for reading (`~/Documents`, `~/Desktop`, `~/Downloads`, ...), and, outsid
 `~`, anything not under `/Volumes` or `/private/tmp` (`/opt/homebrew/bin` or
 `/usr/local` hold programs that run later, outside the sandbox).
 
+## Use in VS Code
+
+1. Open VS Code's settings file: Cmd+Shift+P, "Preferences: Open User
+   Settings (JSON)".
+2. Add this line, with the full path; `~` does not work there:
+
+   ```json
+   "claudeCode.claudeProcessWrapper": "/Users/<you>/.config/claude-sb/claude-sb-vscode"
+   ```
+
+3. Reload the window: Cmd+Shift+P, "Developer: Reload Window".
+
+Every chat in the Claude Code panel now runs in the sandbox, with the same
+policy and start-folder rules as `claude-sb`. Pick the permission mode in the
+panel as usual. To go back, remove the line and reload.
+
+The extension starts the wrapper with the path of the Claude Code it bundles as
+the first argument, then its own options, including the permission mode; it
+also runs `auth status`, which runs in the sandbox without the session flags.
+This is not documented and was checked with extension 2.1.310, so a later
+version may change it. The wrapper runs as a login shell (`zsh -l`), because
+VS Code started from the Dock does not have your terminal's `PATH`; `node`,
+`srt` and your tokens must come from `~/.zprofile`. The extension notes two
+side effects of any wrapper: plan mode is not restored when a conversation is
+resumed, and the "conversation still open" check is skipped.
+
+If the panel does not start, set `CLAUDE_SB_DEBUG` for the Claude process in
+VS Code's settings and read `$TMPDIR/claude-sb-vscode.log`, one line per start:
+
+```json
+"claudeCode.environmentVariables": [{ "name": "CLAUDE_SB_DEBUG", "value": "1" }]
+```
+
 ## What it blocks
 
 - **Writing** anywhere except the project folder, `/tmp`, Claude Code's own

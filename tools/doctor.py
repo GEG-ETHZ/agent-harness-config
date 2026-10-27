@@ -94,6 +94,7 @@ SANDBOX_FILES = (
     "policy.json",
     "claude-sb-run.mjs",
     "claude-sb.zsh",
+    "claude-sb-vscode",
     "agent-guidance.md",
     "README.md",
 )

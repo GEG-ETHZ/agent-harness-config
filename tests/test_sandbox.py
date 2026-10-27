@@ -9,6 +9,7 @@ longer parses.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -87,6 +88,7 @@ def test_makefile_installs_the_files_doctor_compares():
     [
         ("bash", ["-n"], "tests/run.sh"),
         ("zsh", ["-n"], "claude-sb.zsh"),
+        ("zsh", ["-n"], "claude-sb-vscode"),
         ("node", ["--check"], "claude-sb-run.mjs"),
     ],
 )
@@ -97,3 +99,8 @@ def test_scripts_parse(tool, args, script):
     result = subprocess.run([tool, *args, str(SANDBOX / script)], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
+
+
+def test_vscode_wrapper_is_executable():
+    # VS Code runs claudeCode.claudeProcessWrapper directly; make sandbox-install copies the mode.
+    assert os.access(SANDBOX / "claude-sb-vscode", os.X_OK)

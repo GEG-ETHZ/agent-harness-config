@@ -9,7 +9,7 @@ TARGETS ?= claude codex opencode
 # claude-sb (sandbox/) is copied, not linked, so an agent working here cannot change
 # its own live policy. The file list is checked against tools/doctor.py by
 # tests/test_sandbox.py; the srt version is pinned once, in the launcher.
-SANDBOX_FILES := policy.json claude-sb-run.mjs claude-sb.zsh agent-guidance.md README.md
+SANDBOX_FILES := policy.json claude-sb-run.mjs claude-sb.zsh claude-sb-vscode agent-guidance.md README.md
 SANDBOX_DIR   := $(HOME)/.config/claude-sb
 SRT_VERSION   := $(shell sed -n "s/^const SRT_VERSION = '\(.*\)';/\1/p" sandbox/claude-sb-run.mjs)
 SANDBOX_LINE  := [[ -r ~/.config/claude-sb/claude-sb.zsh ]] && source ~/.config/claude-sb/claude-sb.zsh

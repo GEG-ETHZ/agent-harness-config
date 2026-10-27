@@ -273,7 +273,8 @@ make sandbox-install   # the pinned sandbox-runtime, ~/.config/claude-sb/, a lin
 make sandbox-test      # probe the policy
 ```
 
-What it blocks, what it does not, and the login token it needs: `sandbox/README.md`.
+It works in the terminal and in the VS Code extension. What it blocks, what it does not,
+and the login token it needs: `sandbox/README.md`.
 `make doctor` reports an installed copy that is older than `sandbox/`.
 
 ### Cursor and Antigravity are project-scoped
