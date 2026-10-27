@@ -301,8 +301,6 @@ starts with; aliases and functions are missing inside.
 `~/.claude.json.*`, and Claude Code's working state as in supervised, except:
 
 - of `~/.claude/projects`, only `~/.claude/projects/{project}`;
-- not `~/.claude/ide`: Claude would delete VS Code's lock files (VS Code,
-  below);
 - not `~/.claude/plugins`: a plugin brings code that runs in later sessions,
   so install and update plugins outside;
 - not `~/.claude/.credentials.json`, `~/.claude/statsig` or
@@ -360,7 +358,7 @@ first thing a manipulated agent would send out.
 | `/**/.env.example` (`allowRead`) | Lists variable names without values; the agent needs it to know what a project expects. |
 | `.` | The project folder `claude-sb` starts in: the work itself. |
 | `/tmp`, `/private/tmp` | Temporary files; `/tmp` is a link to `/private/tmp` on macOS. |
-| `~/.claude/projects`, `sessions`, `session-env`, `shell-snapshots`, `file-history`, `todos`, `plans`, `tasks`, `paste-cache`, `image-cache`, `cache`, `backups`, `statsig`, `telemetry`, `ide`, `plugins`, `history.jsonl`, `.credentials.json`, `.last-cleanup`, `mcp-needs-auth-cache.json`, `policy-limits.json*`, `remote-settings.json*` | What Claude Code writes during a session. Only these, not all of `~/.claude`: the rules, skills, agents, commands, `CLAUDE.md` and hooks there steer every later session, plain `claude` included. If a Claude Code update writes somewhere new, it shows up as a denied write; add the path here. |
+| `~/.claude/projects`, `sessions`, `session-env`, `shell-snapshots`, `file-history`, `todos`, `plans`, `tasks`, `paste-cache`, `image-cache`, `cache`, `backups`, `statsig`, `telemetry`, `plugins`, `history.jsonl`, `.credentials.json`, `.last-cleanup`, `mcp-needs-auth-cache.json`, `policy-limits.json*`, `remote-settings.json*` | What Claude Code writes during a session. Only these, not all of `~/.claude`: the rules, skills, agents, commands, `CLAUDE.md` and hooks there steer every later session, plain `claude` included. If a Claude Code update writes somewhere new, it shows up as a denied write; add the path here. Not `~/.claude/ide`, where VS Code keeps its lock files (VS Code, below). |
 | `~/.claude.json`, `~/.claude.json.*` | Claude Code's main state file and the temporary copies it writes before replacing it. |
 | `~/.cache`, `~/.npm`, `~/Library/Caches` | Download and build caches of uv, pip, npm and others. Tools outside the sandbox use them too (see Limitations), but every tool keeps its own and no narrower rule fits them all. |
 | `~/.claude/settings.json` (`denyWrite`) | The permission rules for every session. An agent changing its own rules is overreach, however well meant. |
@@ -453,9 +451,10 @@ the current selection need nothing more. `/ide` from a terminal is different:
 it finds VS Code through a lock file in `~/.claude/ide` and connects on a local
 port. The sandbox does not let Claude check whether the VS Code process is
 running, so Claude takes the lock file for stale and deletes it, which also
-hides VS Code from plain `claude` until the window is reloaded. strict keeps
-`~/.claude/ide` read-only for that reason, and needs `allowLocalBinding` for
-the connection, which opens every local port.
+hides VS Code from plain `claude` until the window is reloaded. Both profiles
+keep `~/.claude/ide` read-only for that reason. In supervised, `/ide` then
+connects; strict also needs `allowLocalBinding` for the connection, which
+opens every local port.
 
 If the panel does not start, set `CLAUDE_SB_DEBUG` for the Claude process in
 VS Code's settings and read `$TMPDIR/claude-sb-vscode.log`, one line per start:
