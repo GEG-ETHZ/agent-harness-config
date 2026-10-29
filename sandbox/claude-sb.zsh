@@ -72,6 +72,12 @@ _CLAUDE_SB_ENV=(UV_TOOL_DIR="$HOME/.cache/claude-sb/uv-tools"
 # from finding them; it does not hide the sockets from a deliberate search.
 _CLAUDE_SB_UNSET=(SSH_AUTH_SOCK SSH_AGENT_PID DOCKER_HOST)
 
+# Settings for every sandboxed session: Claude Code's own Bash sandbox off, and
+# a SessionStart hook that prints CLAUDE_SB_SESSION_MESSAGE (JSON, set by the
+# launcher), which shows its systemMessage in the session, terminal and VS Code
+# panel alike.
+_CLAUDE_SB_SETTINGS='{"sandbox":{"enabled":false},"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"printf %s \"$CLAUDE_SB_SESSION_MESSAGE\""}]}]}}'
+
 _claude_sb_depth() {
   # Number of path components in $1 ("/a/b" -> 2).
   local -a parts
@@ -181,19 +187,26 @@ _claude_sb_launch() {
   node "$_CLAUDE_SB_RUNNER" --print "$_CLAUDE_SB_POLICY" $local_args 2>/dev/null | grep -q '"network"' \
     && network=filtered
 
-  print -u2 "sandboxed ($profile): writes -> ${project/#${HOME:A}/~}, network -> $network"
+  local sb_status="sandboxed ($profile): writes -> ${project/#${HOME:A}/~}, network -> $network"
+  print -u2 "$sb_status"
+  # As a JSON string: backslashes and quotes in the project path escaped.
+  local sb_json=${${sb_status//\\/\\\\}//\"/\\\"}
 
   # A Seatbelt sandbox cannot start another one inside, so Claude Code's own
   # Bash sandbox is switched off for this session; srt already covers Bash.
+  # The SessionStart hook shows the status line in the session itself, where
+  # the VS Code panel shows no terminal output: a chat without it did not go
+  # through claude-sb.
   # Updates write outside the sandbox, so they are left to plain `claude`.
   local -a unset_args session_args
   local name
   for name in $_CLAUDE_SB_UNSET; do unset_args+=(-u $name); done
   if [[ $# -eq 0 || $1 == -* ]]; then
-    session_args=(--settings '{"sandbox":{"enabled":false}}' --append-system-prompt-file "$_CLAUDE_SB_GUIDANCE")
+    session_args=(--settings "$_CLAUDE_SB_SETTINGS" --append-system-prompt-file "$_CLAUDE_SB_GUIDANCE")
   fi
   env $unset_args $_CLAUDE_SB_ENV \
     CLAUDE_CODE_OAUTH_TOKEN="$token" DISABLE_AUTOUPDATER=1 \
+    CLAUDE_SB_SESSION_MESSAGE="{\"systemMessage\":\"claude-sb: $sb_json\"}" \
     node "$_CLAUDE_SB_RUNNER" "$srt_dist" "$_CLAUDE_SB_POLICY" $local_args -- \
     $claude_cmd $session_args "$@"
 }
