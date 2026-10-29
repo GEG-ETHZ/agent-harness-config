@@ -28,7 +28,7 @@ _CLAUDE_SB_POLICY="$_CLAUDE_SB_DIR/policy.json"
 _CLAUDE_SB_LOCAL_POLICY="$_CLAUDE_SB_DIR/policy.local.json"
 _CLAUDE_SB_RUNNER="$_CLAUDE_SB_DIR/claude-sb-run.mjs"
 # Tells the agent what the sandbox blocks and what to do instead of working
-# around a block; passed only to sandboxed sessions, so plain claude pays no
+# around a block; added only to sandboxed sessions, so plain claude pays no
 # context for it.
 _CLAUDE_SB_GUIDANCE="$_CLAUDE_SB_DIR/agent-guidance.md"
 
@@ -73,12 +73,15 @@ _CLAUDE_SB_ENV=(UV_TOOL_DIR="$HOME/.cache/claude-sb/uv-tools"
 _CLAUDE_SB_UNSET=(SSH_AUTH_SOCK SSH_AGENT_PID DOCKER_HOST)
 
 # Settings for every sandboxed session: Claude Code's own Bash sandbox off, and
-# a UserPromptSubmit hook that prints CLAUDE_SB_SESSION_MESSAGE (JSON, set by
-# the launcher) on the first prompt. Its systemMessage shows in the terminal
-# and the VS Code panel alike; a SessionStart hook's message does not reach the
-# panel (extension 2.1.312). A marker file per Claude process ($PPID) in /tmp,
-# writable in both profiles, keeps it to the first prompt.
-_CLAUDE_SB_SETTINGS='{"sandbox":{"enabled":false},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"f=/tmp/claude-sb-shown.$PPID; [ -e \"$f\" ] && exit 0; : > \"$f\"; printf %s \"$CLAUDE_SB_SESSION_MESSAGE\""}]}]}}'
+# two hooks. SessionStart prints CLAUDE_SB_GUIDANCE, which Claude Code adds to
+# the context on start, /clear and /compact. Not --append-system-prompt-file:
+# the VS Code extension sends its own appended prompt, which replaces that one
+# (extension 2.1.312). UserPromptSubmit prints CLAUDE_SB_SESSION_MESSAGE (JSON,
+# set by the launcher) on the first prompt. Its systemMessage shows in the
+# terminal and the VS Code panel alike; a SessionStart hook's message does not
+# reach the panel. A marker file per Claude process ($PPID) in /tmp, writable
+# in both profiles, keeps it to the first prompt.
+_CLAUDE_SB_SETTINGS='{"sandbox":{"enabled":false},"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"cat \"$CLAUDE_SB_GUIDANCE\""}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"f=/tmp/claude-sb-shown.$PPID; [ -e \"$f\" ] && exit 0; : > \"$f\"; printf %s \"$CLAUDE_SB_SESSION_MESSAGE\""}]}]}}'
 
 _claude_sb_depth() {
   # Number of path components in $1 ("/a/b" -> 2).
@@ -198,17 +201,18 @@ _claude_sb_launch() {
   # Bash sandbox is switched off for this session; srt already covers Bash.
   # The prompt hook shows the status line in the session itself, where
   # the VS Code panel shows no terminal output: a chat without it did not go
-  # through claude-sb.
+  # through claude-sb. The start hook gives Claude the guidance.
   # Updates write outside the sandbox, so they are left to plain `claude`.
   local -a unset_args session_args
   local name
   for name in $_CLAUDE_SB_UNSET; do unset_args+=(-u $name); done
   if [[ $# -eq 0 || $1 == -* ]]; then
-    session_args=(--settings "$_CLAUDE_SB_SETTINGS" --append-system-prompt-file "$_CLAUDE_SB_GUIDANCE")
+    session_args=(--settings "$_CLAUDE_SB_SETTINGS")
   fi
   env $unset_args $_CLAUDE_SB_ENV \
     CLAUDE_CODE_OAUTH_TOKEN="$token" DISABLE_AUTOUPDATER=1 \
     CLAUDE_SB_SESSION_MESSAGE="{\"systemMessage\":\"claude-sb: $sb_json\"}" \
+    CLAUDE_SB_GUIDANCE="$_CLAUDE_SB_GUIDANCE" \
     node "$_CLAUDE_SB_RUNNER" "$srt_dist" "$_CLAUDE_SB_POLICY" $local_args -- \
     $claude_cmd $session_args "$@"
 }

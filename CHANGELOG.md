@@ -41,7 +41,9 @@ Run `make setup-user` again after `make update`.
   `~/.config/claude-sb/policy.local.json` (`make sandbox-policy` shows the result). Both
   keep `~/.claude/plugins` closed, accept only a fine-grained GitHub token
   (`github_pat_`), and show the start line as a message after the first prompt, the VS
-  Code panel included. `make sandbox-install` shows a changed policy and asks before installing it.
+  Code panel included. Claude learns it is sandboxed from a start hook, so the guidance
+  also reaches the VS Code panel. `make sandbox-install` shows a changed policy and asks
+  before installing it.
   See `sandbox/README.md`.
 
 ## [v0.2.0] — 2026-10-04

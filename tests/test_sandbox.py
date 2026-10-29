@@ -305,6 +305,26 @@ def test_session_settings_turn_off_the_bash_sandbox_and_show_the_status():
     assert "$CLAUDE_SB_SESSION_MESSAGE" in hook["command"]
 
 
+def test_guidance_hook_prints_the_guidance_file(tmp_path):
+    # A start hook, not --append-system-prompt-file: the VS Code extension
+    # replaces that with its own appended prompt.
+    hook = session_settings()["hooks"]["SessionStart"][0]["hooks"][0]
+    guidance = tmp_path / "agent guidance.md"
+    guidance.write_text("stay inside\n")
+    env = {"PATH": os.environ["PATH"], "CLAUDE_SB_GUIDANCE": str(guidance)}
+
+    result = subprocess.run(["sh", "-c", hook["command"]], capture_output=True, text=True, env=env)
+
+    assert result.stdout == "stay inside\n"
+
+
+def test_launcher_passes_the_guidance_only_through_the_hook():
+    launcher = (SANDBOX / "claude-sb.zsh").read_text()
+
+    assert 'session_args=(--settings "$_CLAUDE_SB_SETTINGS")' in launcher
+    assert 'CLAUDE_SB_GUIDANCE="$_CLAUDE_SB_GUIDANCE"' in launcher
+
+
 def test_status_hook_prints_the_message_on_the_first_prompt_only():
     # Arrange: each run is a child of this process, as each prompt's hook is of Claude.
     command = session_settings()["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]

@@ -516,8 +516,12 @@ pins the `srt` version (`SRT_VERSION`) and refuses any other.
 
 ### When Claude is blocked
 
-`claude-sb` adds `agent-guidance.md` to Claude's system prompt: what the
-sandbox blocks, and that a block is handed to you, not worked around. When a
+`claude-sb` gives Claude `agent-guidance.md`: what the sandbox blocks, and
+that a block is handed to you, not worked around. A `SessionStart` hook (in
+`--settings`, for this session only) prints it, and Claude Code adds it to the
+context at the start and again after `/clear` and `/compact`. It is a hook,
+not `--append-system-prompt-file`, because the VS Code extension sends its own
+appended prompt, which replaces that one (checked with extension 2.1.312). When a
 block looks like a gap in the policy, Claude drafts a report with the path,
 the error, the narrowest rule that would allow it and what else that rule
 would open; filing it is up to you. A change for everyone goes into
