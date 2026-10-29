@@ -302,6 +302,9 @@ if [[ $PROFILE == strict ]]; then
   expect_block "write another project's Claude memory" \
     'mkdir -p ~/.claude/projects/srt-probe' 'rmdir ~/.claude/projects/srt-probe'
   expect_block_checked "read Claude's login file" 'cat ~/.claude/.credentials.json'
+  # TODO: probe loopback (127.0.0.0/8, ::1) and link-local in strict. A probe
+  # only counts against a listener started outside the sandbox, one that
+  # answers there; a closed port fails outside too and proves nothing.
 fi
 
 echo "-- claude-sb starts only in a single project folder"

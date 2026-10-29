@@ -315,8 +315,10 @@ No download caches.
 
 **Network:** `api.anthropic.com`, `statsig.anthropic.com`, `claude.ai` and
 `console.anthropic.com` only (`strictAllowlist`), no addresses in private
-networks (`deniedResolvedAddresses`), no local ports
-(`allowLocalBinding: false`), and `enableWeakerNetworkIsolation` off.
+networks, loopback or link-local (`deniedResolvedAddresses`), no local ports
+(`allowLocalBinding: false`), and `enableWeakerNetworkIsolation` off. srt
+already refuses loopback, link-local and cloud metadata addresses itself;
+they are listed so the policy says so too.
 
 ### The supervised profile
 
