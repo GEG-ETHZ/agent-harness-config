@@ -159,6 +159,10 @@ update: ## Pull the latest shared config and reinstall
 		echo "==> $$t"; $(ECC)/install.sh --profile $(PROFILE) --enable-hooks --target $$t || exit 1; \
 	done
 	@python3 tools/setup-user.py --restore
+	@[ ! -d $(SANDBOX_DIR) ] || for f in $(SANDBOX_FILES); do \
+		cmp -s sandbox/$$f $(SANDBOX_DIR)/$$f || { \
+			echo "claude-sb changed: run make sandbox-install in a normal terminal"; break; }; \
+	done
 
 
 validate: ## Check the pin, the overlay and custom/ are consistent

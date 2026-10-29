@@ -1084,7 +1084,7 @@ class TestSandbox:
         doctor.check_sandbox()
 
         # Assert
-        assert statuses(doctor) == [doctor.ERR]
+        assert statuses(doctor) == [doctor.WARN]
         assert "policy.json" in headlines(doctor)
         assert "claude-sb.zsh" not in headlines(doctor)
         assert "make sandbox-install" in doctor.findings[0][2]
@@ -1098,5 +1098,5 @@ class TestSandbox:
         doctor.check_sandbox()
 
         # Assert
-        assert statuses(doctor) == [doctor.ERR]
+        assert statuses(doctor) == [doctor.WARN]
         assert "README.md" in headlines(doctor)

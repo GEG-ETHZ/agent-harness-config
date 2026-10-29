@@ -665,9 +665,10 @@ def check_sandbox() -> None:
         if not (installed / name).is_file()
         or (installed / name).read_bytes() != (REPO / "sandbox" / name).read_bytes()
     ]
+    # A warning: claude-sb is optional, and `make update` does not reinstall it.
     if differs:
         note(
-            ERR,
+            WARN,
             f"sandbox: the installed claude-sb differs from sandbox/ ({', '.join(differs)})",
             "run `make sandbox-install`, then open a new terminal",
         )

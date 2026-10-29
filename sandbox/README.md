@@ -127,7 +127,8 @@ this repository. You need macOS and `node`.
    network is filtered.
 
 After pulling changes to `sandbox/`, run `make sandbox-install` again;
-`make doctor` tells you when the installed copy is out of date.
+`make doctor` warns when the installed copy is out of date. If a policy
+changed, the install shows the difference and asks before copying it.
 
 ### Use
 
