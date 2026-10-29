@@ -27,7 +27,8 @@ def policy(name: str = "policy.json") -> dict:
 
 
 def test_policy_has_no_network_block():
-    # The launcher runs with the network open and refuses a policy that has one.
+    # Supervised has no network block: the launcher then leaves the network
+    # open. A block would switch it to filtering.
     assert "network" not in policy()
 
 
@@ -117,7 +118,7 @@ def effective_policy(local: Path | None, cwd: Path | None = None) -> dict:
     return json.loads(result.stdout)
 
 
-def test_personal_policy_only_adds_to_the_shared_one(tmp_path):
+def test_personal_policy_extends_lists_and_replaces_settings(tmp_path):
     # Arrange
     shared = policy()
     already_denied = shared["filesystem"]["denyRead"][0]

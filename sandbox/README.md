@@ -13,6 +13,14 @@ Plain `claude` stays as it is, without any of this protection. If you use it,
 use it deliberately: everything the sandbox blocks is open there, your logins
 and the rest of your machine included.
 
+Unlike a dev container, there is no per-project setup. `claude-sb` builds the
+sandbox around the folder it starts in, so one install covers every project,
+and the project keeps its real path: no mount points, no second environment
+to keep up to date, nothing to rebuild when the agent needs another folder.
+The folder is fixed for the session; for another project, start `claude-sb`
+there. A container isolates more strictly, since the agent sees only what is
+mounted; the strict profile comes closest to that.
+
 This README has two parts. **Part 1** is what you need to set it up and use
 it. **Part 2** explains how it works and why it is built this way.
 
@@ -46,7 +54,8 @@ and your Claude Code settings), credentials, the ssh-agent, and `git push`.
 ### Set up
 
 Run every step in a normal terminal, not inside `claude-sb`, from the root of
-this repository. You need macOS and `node`.
+this repository. You need macOS and Node.js (the `node` command, for example
+from `brew install node`).
 
 1. **Install it.**
 
@@ -147,7 +156,9 @@ rather than handing it to an agent without the sandbox. Commands started with
 
 1. Open VS Code's settings file: Cmd+Shift+P, "Preferences: Open User
    Settings (JSON)".
-2. Add this line, with the full path; `~` does not work there:
+2. Add this line anywhere inside the outer `{ }`, with the full path; `~`
+   does not work there. Put a comma after the line before it, or after this
+   one if more follow:
 
    ```json
    "claudeCode.claudeProcessWrapper": "/Users/<you>/.config/claude-sb/claude-sb-vscode"
@@ -531,9 +542,19 @@ not possible from inside one sandbox:
   servers can write wherever their tokens allow.
 - **Some writes run later, outside the sandbox.** `~/.claude.json` (holds
   `mcpServers`), a project's `.claude/settings.local.json` (hooks; gitignored,
-  so invisible in `git status`), and in supervised also the shared caches and
-  other projects' memory. Plain `claude` and other tools use them later.
-  `~/.claude.json` cannot be closed: Claude Code writes it all the time.
+  so invisible in `git status`), the project's `.pre-commit-config.yaml`
+  (`repo: local` hooks run on the next commit), and in supervised also the
+  shared caches and other projects' memory. Plain `claude`, git and other
+  tools use them later. `~/.claude.json` cannot be closed: Claude Code writes
+  it all the time.
+- **Other projects' Claude state is readable in strict.** Strict closes other
+  projects' transcripts and memory (`~/.claude/projects/*`), but not
+  `history.jsonl` (every prompt, from every project), `file-history`
+  (copies of files Claude edited), `paste-cache`, `plans`, `todos` and
+  `shell-snapshots`. Claude Code names the files in them per session or at
+  random, not per project, so no rule can open the current session's files
+  and close the rest; closing the folders would break Bash (it reads its
+  shell snapshot on every command), plan mode and rewinding.
 - **Other terminal windows.** `allowPty` opens every `/dev/ttys*`, not only the
   session's own terminal. Untested whether a process inside can use that.
 - **Keychain item names** (not their secrets) are still listed by
