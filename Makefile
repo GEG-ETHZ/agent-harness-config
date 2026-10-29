@@ -172,6 +172,8 @@ clean: ## Remove the materialized upstream checkout
 
 # Run it in a normal terminal: inside claude-sb, ~/.config/claude-sb and the global
 # npm folder are not writable. Safe to run again; it only adds what is missing.
+# A change to an installed policy is shown and must be confirmed (YES=1 skips the
+# question): an agent working in this repo can edit sandbox/policy*.json.
 sandbox-install: ## Install claude-sb (macOS): the pinned srt, the files in ~/.config/claude-sb, the line in ~/.zshrc
 	@[ "$$(uname)" = Darwin ] || { echo "claude-sb needs macOS"; exit 1; }
 	@[ -n "$(SRT_VERSION)" ] || { echo "no SRT_VERSION in sandbox/claude-sb-run.mjs"; exit 1; }
@@ -179,6 +181,15 @@ sandbox-install: ## Install claude-sb (macOS): the pinned srt, the files in ~/.c
 		if [ "$$installed" != "$(SRT_VERSION)" ]; then \
 			echo "==> installing sandbox-runtime $(SRT_VERSION)"; \
 			npm i -g @anthropic-ai/sandbox-runtime@$(SRT_VERSION) || exit 1; fi
+	@for f in $(filter policy%,$(SANDBOX_FILES)); do \
+		[ -f $(SANDBOX_DIR)/$$f ] || continue; \
+		cmp -s sandbox/$$f $(SANDBOX_DIR)/$$f && continue; \
+		echo "==> sandbox/$$f differs from the installed copy:"; \
+		diff -u $(SANDBOX_DIR)/$$f sandbox/$$f; \
+		if [ "$(YES)" != 1 ]; then \
+			printf 'Install this policy change? [y/N] '; read answer; \
+			[ "$$answer" = y ] || { echo "not installed"; exit 1; }; fi; \
+	done
 	mkdir -p $(SANDBOX_DIR)
 	cp $(addprefix sandbox/,$(SANDBOX_FILES)) $(SANDBOX_DIR)/
 	@grep -qxF '$(SANDBOX_LINE)' $(HOME)/.zshrc 2>/dev/null || { \

@@ -268,6 +268,9 @@ machine. srt's documentation lists every setting:
 
 The installed files are copied, not linked, so an agent working in this
 repository cannot change its own live policy or the code every new shell runs.
+It can still edit `sandbox/policy*.json`, which the next install would copy;
+so `make sandbox-install` shows the difference to an installed policy and
+asks first (`YES=1` skips the question, for scripts).
 
 ### The strict profile
 
