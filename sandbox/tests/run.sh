@@ -161,6 +161,13 @@ expect_start() {
   fi
 }
 
+# remove_if_created PATH: a cleanup for an append probe (": >> PATH"). If the
+# block fails and PATH did not exist, the append created it empty; remove it
+# then, and leave a file that has content alone.
+remove_if_created() {
+  printf '[[ -s %q ]] || rm -f %q' "$1" "$1"
+}
+
 reachable() {
   printf 'curl -sS -o /dev/null -m %s %s' "$NETWORK_TIMEOUT_SECONDS" "$1"
 }
@@ -265,19 +272,24 @@ expect_block_checked "use the gh login"         'gh api user >/dev/null'
 echo "-- nothing outside the project changes"
 expect_block "write another project"        "touch $OTHER_PROJECT/srt-probe" \
   "rm -f $OTHER_PROJECT/srt-probe"
-expect_block "append to ~/.zshrc"           ': >> ~/.zshrc'
-expect_block "append to ~/.zprofile"        ': >> ~/.zprofile'
-expect_block "edit Claude settings"         ': >> ~/.claude/settings.json'
+expect_block "append to ~/.zshrc"           ': >> ~/.zshrc' \
+  "$(remove_if_created ~/.zshrc)"
+expect_block "append to ~/.zprofile"        ': >> ~/.zprofile' \
+  "$(remove_if_created ~/.zprofile)"
+expect_block "edit Claude settings"         ': >> ~/.claude/settings.json' \
+  "$(remove_if_created ~/.claude/settings.json)"
 expect_block "delete VS Code's lock files"  'mkdir -p ~/.claude/ide && touch ~/.claude/ide/srt-probe.lock' \
   'rm -f ~/.claude/ide/srt-probe.lock'
-expect_block "edit a hook script"           ': >> ~/.claude/scripts/hooks/block-no-verify.js'
+expect_block "edit a hook script"           ': >> ~/.claude/scripts/hooks/block-no-verify.js' \
+  "$(remove_if_created ~/.claude/scripts/hooks/block-no-verify.js)"
 expect_block "install a Claude plugin"      'mkdir -p ~/.claude/plugins/srt-probe' \
   'rmdir ~/.claude/plugins/srt-probe'
 expect_block "write a user rule"            'touch ~/.claude/rules/srt-probe.md' \
   'rm -f ~/.claude/rules/srt-probe.md'
 expect_block "write a user skill"           'mkdir -p ~/.claude/skills/srt-probe' \
   'rm -rf ~/.claude/skills/srt-probe'
-expect_block "edit the sandbox policy"      ': >> ~/.config/claude-sb/policy.json'
+expect_block "edit the sandbox policy"      ': >> ~/.config/claude-sb/policy.json' \
+  "$(remove_if_created ~/.config/claude-sb/policy.json)"
 expect_block "write a dotfile in ~"         'touch ~/.srt-probe' 'rm -f ~/.srt-probe'
 expect_block "brew/npm -g (/opt/homebrew)"  'touch /opt/homebrew/.srt-probe' \
   'rm -f /opt/homebrew/.srt-probe'
