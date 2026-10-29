@@ -40,8 +40,8 @@ Run `make setup-user` again after `make update`.
   which closes everything in `~` and the network and opens only the exceptions you list in
   `~/.config/claude-sb/policy.local.json` (`make sandbox-policy` shows the result). Both
   keep `~/.claude/plugins` closed, accept only a fine-grained GitHub token
-  (`github_pat_`), and show the start line as a message in the session, the VS Code panel
-  included. `make sandbox-install` shows a changed policy and asks before installing it.
+  (`github_pat_`), and show the start line as a message after the first prompt, the VS
+  Code panel included. `make sandbox-install` shows a changed policy and asks before installing it.
   See `sandbox/README.md`.
 
 ## [v0.2.0] — 2026-10-04

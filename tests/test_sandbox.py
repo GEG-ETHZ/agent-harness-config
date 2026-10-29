@@ -292,13 +292,37 @@ def test_launcher_accepts_a_fine_grained_github_token():
     assert "not a fine-grained token" not in result.stderr
 
 
-def test_session_settings_turn_off_the_bash_sandbox_and_show_the_status():
-    result = wrapper("print -r -- $_CLAUDE_SB_SETTINGS")
+def session_settings() -> dict:
+    return json.loads(wrapper("print -r -- $_CLAUDE_SB_SETTINGS").stdout)
 
-    settings = json.loads(result.stdout)
-    hook = settings["hooks"]["SessionStart"][0]["hooks"][0]
+
+def test_session_settings_turn_off_the_bash_sandbox_and_show_the_status():
+    # A prompt hook, not SessionStart: the VS Code panel shows only the former's message.
+    settings = session_settings()
+
+    hook = settings["hooks"]["UserPromptSubmit"][0]["hooks"][0]
     assert settings["sandbox"] == {"enabled": False}
     assert "$CLAUDE_SB_SESSION_MESSAGE" in hook["command"]
+
+
+def test_status_hook_prints_the_message_on_the_first_prompt_only():
+    # Arrange: each run is a child of this process, as each prompt's hook is of Claude.
+    command = session_settings()["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]
+    env = {"PATH": os.environ["PATH"], "CLAUDE_SB_SESSION_MESSAGE": '{"systemMessage":"x"}'}
+    marker = Path(f"/tmp/claude-sb-shown.{os.getpid()}")
+    marker.unlink(missing_ok=True)
+
+    # Act
+    try:
+        outputs = [
+            subprocess.run(["sh", "-c", command], capture_output=True, text=True, env=env).stdout
+            for _ in range(2)
+        ]
+    finally:
+        marker.unlink(missing_ok=True)
+
+    # Assert
+    assert outputs == ['{"systemMessage":"x"}', ""]
 
 
 def test_supervised_keeps_plugins_closed():

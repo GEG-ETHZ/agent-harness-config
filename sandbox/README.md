@@ -179,8 +179,9 @@ rather than handing it to an agent without the sandbox. Commands started with
 
 Every chat in the Claude Code panel now runs in the sandbox, with the same
 profile as `claude-sb`. Pick the permission mode in the panel as usual. To go
-back, remove the line and reload. A sandboxed chat starts with the message
-`claude-sb: sandboxed (<profile>) ...`; a chat without it is not sandboxed.
+back, remove the line and reload. In a sandboxed chat, your first prompt is
+followed by the message `UserPromptSubmit says: claude-sb: sandboxed
+(<profile>) ...`; a chat without it is not sandboxed.
 In strict, `/ide` from `claude-sb` in VS
 Code's terminal needs an exception (Add exceptions); the panel does not.
 
@@ -478,10 +479,14 @@ is not restored when a conversation is resumed, and the "conversation still
 open" check is skipped.
 
 The panel shows no terminal output, so the start line would be invisible
-there. `claude-sb` therefore also passes a `SessionStart` hook (in
-`--settings`, for this session only) that shows the same line as a message in
-the chat. It comes from the wrapper, so if an extension update stops using
-the wrapper, the message is gone too.
+there. `claude-sb` therefore also passes a `UserPromptSubmit` hook (in
+`--settings`, for this session only) that shows the same line as a message
+after the first prompt; a marker file in `/tmp` per Claude process keeps it
+from repeating. It is a prompt hook because the panel does not show a
+`SessionStart` hook's message (checked with extension 2.1.312), and it shows
+messages only once the chat has content. The hook comes from the wrapper, so
+if an extension update stops using the wrapper, the message is gone too. The
+start line is also in the extension's log: Output, "Claude VSCode".
 
 The chat panel talks to Claude through the process it starts, so diffs and
 the current selection need nothing more. `/ide` from a terminal is different:

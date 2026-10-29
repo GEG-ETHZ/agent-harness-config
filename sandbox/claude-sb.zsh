@@ -73,10 +73,12 @@ _CLAUDE_SB_ENV=(UV_TOOL_DIR="$HOME/.cache/claude-sb/uv-tools"
 _CLAUDE_SB_UNSET=(SSH_AUTH_SOCK SSH_AGENT_PID DOCKER_HOST)
 
 # Settings for every sandboxed session: Claude Code's own Bash sandbox off, and
-# a SessionStart hook that prints CLAUDE_SB_SESSION_MESSAGE (JSON, set by the
-# launcher), which shows its systemMessage in the session, terminal and VS Code
-# panel alike.
-_CLAUDE_SB_SETTINGS='{"sandbox":{"enabled":false},"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"printf %s \"$CLAUDE_SB_SESSION_MESSAGE\""}]}]}}'
+# a UserPromptSubmit hook that prints CLAUDE_SB_SESSION_MESSAGE (JSON, set by
+# the launcher) on the first prompt. Its systemMessage shows in the terminal
+# and the VS Code panel alike; a SessionStart hook's message does not reach the
+# panel (extension 2.1.312). A marker file per Claude process ($PPID) in /tmp,
+# writable in both profiles, keeps it to the first prompt.
+_CLAUDE_SB_SETTINGS='{"sandbox":{"enabled":false},"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"f=/tmp/claude-sb-shown.$PPID; [ -e \"$f\" ] && exit 0; : > \"$f\"; printf %s \"$CLAUDE_SB_SESSION_MESSAGE\""}]}]}}'
 
 _claude_sb_depth() {
   # Number of path components in $1 ("/a/b" -> 2).
@@ -194,7 +196,7 @@ _claude_sb_launch() {
 
   # A Seatbelt sandbox cannot start another one inside, so Claude Code's own
   # Bash sandbox is switched off for this session; srt already covers Bash.
-  # The SessionStart hook shows the status line in the session itself, where
+  # The prompt hook shows the status line in the session itself, where
   # the VS Code panel shows no terminal output: a chat without it did not go
   # through claude-sb.
   # Updates write outside the sandbox, so they are left to plain `claude`.
