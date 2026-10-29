@@ -141,15 +141,17 @@ _claude_sb_launch() {
   # (z) splits into shell words, (Q) removes the quoting ${(q)...} added.
   local -a claude_cmd=("${(@Q)${(z)1}}")
   shift
-  if ! command -v srt >/dev/null 2>&1; then
-    print -u2 "claude-sb: srt not found. In agent-harness-config, run: make sandbox-install"
+  # Only a fine-grained token (github_pat_) can be limited to Contents: read.
+  # Any other kind (classic ghp_, the gh CLI's OAuth gho_) can push from
+  # inside, and do everything else the token allows.
+  local github_token=${GITHUB_PERSONAL_ACCESS_TOKEN:-}
+  if [[ -n $github_token && $github_token != github_pat_* ]]; then
+    print -u2 "claude-sb: GITHUB_PERSONAL_ACCESS_TOKEN is not a fine-grained token (it starts with ${github_token[1,4]}), so it may push code."
+    print -u2 "  Use a fine-grained token with Contents: read (see sandbox/README.md, Set up)."
     return 1
   fi
-  # A classic token (ghp_) has no Contents: read-only setting: with it, git
-  # push works from inside, and so does everything else the token allows.
-  if [[ ${GITHUB_PERSONAL_ACCESS_TOKEN:-} == ghp_* ]]; then
-    print -u2 "claude-sb: GITHUB_PERSONAL_ACCESS_TOKEN is a classic token, which can push code."
-    print -u2 "  Use a fine-grained token with Contents: read (see sandbox/README.md, Set up)."
+  if ! command -v srt >/dev/null 2>&1; then
+    print -u2 "claude-sb: srt not found. In agent-harness-config, run: make sandbox-install"
     return 1
   fi
   local file

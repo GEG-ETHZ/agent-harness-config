@@ -80,8 +80,9 @@ this repository. You need macOS and `node`.
       settings, Personal access tokens, Fine-grained tokens): only the
       repositories you work in, Contents: **Read-only**, no access to
       Workflows. For the GitHub MCP server, the same token can also get
-      Issues and Pull requests: Read and write. `claude-sb` refuses a classic
-      token (`ghp_...`).
+      Issues and Pull requests: Read and write. `claude-sb` refuses any other
+      kind of token: only a fine-grained one (`github_pat_...`) can be
+      limited to reading code.
    2. Store it in the Keychain, and export it from `~/.zprofile` (VS Code
       reads that file, not `~/.zshrc`):
 
@@ -413,7 +414,9 @@ only, so `~/.gitconfig` and plain `claude` are untouched:
 
 This is safe only while the token cannot write code: with Contents: Read-only,
 GitHub refuses `git push` ("Write access to repository not granted"). That is
-why `claude-sb` refuses a classic token, which cannot be limited, and why
+why `claude-sb` refuses every token that is not fine-grained (`github_pat_`):
+a classic token (`ghp_`) or the `gh` CLI's login (`gho_`) cannot be limited
+to reading. It is also why
 `make sandbox-test` checks that a push fails when `CLAUDE_SB_TEST_REPO` is
 set. Pull requests, issues and comments go through the GitHub MCP server.
 

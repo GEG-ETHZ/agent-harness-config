@@ -258,3 +258,34 @@ def test_strict_opens_only_the_current_projects_claude_folder(tmp_path):
     assert f"~/.claude/projects/{key}" in filesystem["allowWrite"]
     assert "~/.claude/projects" not in filesystem["allowWrite"]
     assert not any("{project}" in entry for entry in filesystem["allowWrite"])
+
+
+def wrapper(script: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    if shutil.which("zsh") is None:
+        pytest.skip("zsh not installed")
+    return subprocess.run(
+        ["zsh", "-c", f"source {SANDBOX / 'claude-sb.zsh'} && {script}"],
+        capture_output=True,
+        text=True,
+        env={"PATH": os.environ["PATH"], "HOME": os.environ["HOME"], **(env or {})},
+    )
+
+
+@pytest.mark.parametrize("token", ["ghp_classic", "gho_from_gh_auth_token", "ghs_app", "plain"])
+def test_launcher_refuses_a_github_token_that_is_not_fine_grained(token):
+    # Only a fine-grained token can be limited to reading code.
+    result = wrapper("_claude_sb_launch claude", {"GITHUB_PERSONAL_ACCESS_TOKEN": token})
+
+    assert result.returncode == 1
+    assert "not a fine-grained token" in result.stderr
+
+
+def test_launcher_accepts_a_fine_grained_github_token():
+    # Arrange: stop at the next check, the missing srt, so nothing starts.
+    env = {"GITHUB_PERSONAL_ACCESS_TOKEN": "github_pat_example", "PATH": "/usr/bin:/bin"}
+
+    # Act
+    result = wrapper("_claude_sb_launch claude", env)
+
+    # Assert
+    assert "not a fine-grained token" not in result.stderr
