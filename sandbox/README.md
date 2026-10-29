@@ -98,9 +98,12 @@ from `brew install node`).
       ```bash
       security add-generic-password -U -s github-token -a "$USER" -w
 
-      # in ~/.zprofile
-      export GITHUB_PERSONAL_ACCESS_TOKEN=$(security find-generic-password -s github-token -a "$USER" -w 2>/dev/null)
+      # ~/.zprofile — only if not set yet, so a value passed in from outside wins
+      [[ -z $GITHUB_PERSONAL_ACCESS_TOKEN ]] && GITHUB_PERSONAL_ACCESS_TOKEN=$(security find-generic-password -s github-token -a "$USER" -w 2>/dev/null) && export GITHUB_PERSONAL_ACCESS_TOKEN
       ```
+
+      Without the `[[ -z ... ]]` check, a shell started inside the sandbox
+      reads `~/.zprofile`, cannot reach the Keychain, and empties the token.
 
 4. **For strict: create your policy.** Skip this step for supervised. Start
    from the example, which opens uv, PyPI and GitHub:
@@ -134,6 +137,14 @@ from `brew install node`).
 
    The first line shows the profile, where it may write and whether the
    network is filtered.
+
+**Your other tokens** (Confluence, Jira, and the like) need no change, with
+one exception: export them from `~/.zprofile`, not only `~/.zshrc`, or the
+MCP servers in the VS Code panel start without them. Keeping them in the
+Keychain is recommended but not required: an exported token is readable
+inside the sandbox either way (Limitations), but a token kept as plain text
+in a file in `~` is readable in supervised even when it was not meant for
+this session. The main `README.md` (*First 10 minutes*) shows how.
 
 After pulling changes to `sandbox/`, run `make sandbox-install` again;
 `make doctor` warns when the installed copy is out of date. If a policy
