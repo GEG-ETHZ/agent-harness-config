@@ -18,8 +18,9 @@ Ask before you run anything:
    machine. Cursor and Antigravity install per project, so ask which project folders.
 2. **Do they want the Confluence, Jira and BigQuery servers, and the opt-in GitHub one?** If
    yes, they need their Confluence URL and token (and optionally Jira's) first. Ask for
-   them; never guess. Tokens go in their shell profile (`~/.bashrc` or `~/.zshrc`), URLs in
-   `.env`, copied from `.env.example`, which lists every variable `make mcp` reads.
+   them; never guess. Tokens go in the macOS Keychain, and their shell profile exports them
+   by reading them from there (README.md, *First 10 minutes*), never as plain text. URLs go
+   in `.env`, copied from `.env.example`, which lists every variable `make mcp` reads.
 
 Then run, in order: `make install`, `make setup-user`, `make doctor`, then
 `make install-project PROJECT=<path>` for each Cursor or Antigravity project, then `make mcp`
@@ -65,6 +66,9 @@ make uninstall   # remove everything installed (only files recorded in install-s
 make audit       # scan the installed config with AgentShield
 make validate    # check the pin, the overlay and custom/ are consistent
 make clean       # remove the materialized .ecc/ checkout
+make sandbox-install  # install claude-sb, Claude Code in an OS sandbox (macOS, optional)
+make sandbox-test     # probe the claude-sb policy in sandbox/ (macOS)
+make sandbox-policy   # the policy claude-sb runs with, your policy.local.json merged in
 ```
 
 `make install` is reversible: ECC records every file it writes in an install-state file, and
@@ -182,6 +186,7 @@ person has to reverse-engineer.
 | changes how content is authored or which layer to pick | this file |
 | changes the variables `make mcp` reads | `.env.example` |
 | changes what loads when, or where files land | the diagrams and tables in `README.md` |
+| changes `sandbox/` | `sandbox/README.md`: every policy entry has a row (`make test` checks) |
 
 `UPSTREAM.md` is specific to this repo — it exists because we consume a pinned upstream, and
 nothing else we build does. The other three generalise.
@@ -251,6 +256,11 @@ and worth setting a ceiling on.
   `custom/` never fires. Use `always_run: true` and filter inside the script.
 - **Adding a rule costs every person, every session.** Run `make context` before and after.
 - **Cursor and Antigravity are per project.** `make install` alone does not reach them.
+- **`sandbox/` is not part of `make install`.** claude-sb is copied to `~/.config/claude-sb/`
+  by `make sandbox-install`, so an edit in `sandbox/` does nothing until that runs again;
+  `make doctor` names the out-of-date files. It is a separate component, not a skill, rule,
+  command or hook, and its docs explain only the code: nothing about the team goes in
+  `sandbox/`. The `srt` version is pinned once, as `SRT_VERSION` in `claude-sb-run.mjs`.
 
 ## Definition of done
 

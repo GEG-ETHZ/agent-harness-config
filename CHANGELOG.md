@@ -31,6 +31,20 @@ Run `make setup-user` again after `make update`.
 - New skill `close-session`: answers "can I close this?" from uncommitted and unpushed
   work, open pull requests, worktrees, running jobs, ledgers and decisions held only in the
   conversation.
+- `claude-sb` (trial): runs Claude Code inside Anthropic's sandbox-runtime for supervised
+  work, so it cannot change anything outside the project or read credentials and private
+  folders. Optional and macOS-only: `make sandbox-install` puts it in
+  `~/.config/claude-sb/`, `make sandbox-test` probes the policy, and `make doctor` reports
+  an installed copy that is out of date. Works in the VS Code extension through
+  `claudeCode.claudeProcessWrapper`. Two profiles: supervised (the default) and strict,
+  which closes everything in `~` and the network and opens only the exceptions you list in
+  `~/.config/claude-sb/policy.local.json` (`make sandbox-policy` shows the result). Both
+  keep `~/.claude/plugins` closed, accept only a fine-grained GitHub token
+  (`github_pat_`), and show the start line as a message after the first prompt, the VS
+  Code panel included. Claude learns it is sandboxed from a start hook, so the guidance
+  also reaches the VS Code panel. `make sandbox-install` shows a changed policy and asks
+  before installing it.
+  See `sandbox/README.md`.
 
 ## [v0.2.0] — 2026-10-04
 

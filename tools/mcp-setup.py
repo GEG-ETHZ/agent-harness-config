@@ -143,10 +143,10 @@ def resolvers() -> dict[str, str | None]:
 HOWTO = {
     "YOUR_GCP_PROJECT_HERE": "run `gcloud config set project <id>`, or `make mcp GCP_PROJECT=<id>`",
     "CONFLUENCE_URL": "set CONFLUENCE_URL to your Confluence base URL in .env",
-    "CONFLUENCE_TOKEN": "create a personal access token in your Confluence profile, then export CONFLUENCE_TOKEN in your shell profile",
+    "CONFLUENCE_TOKEN": "create a personal access token in your Confluence profile, then store it in the Keychain and export CONFLUENCE_TOKEN from your shell profile (README.md)",
     "JIRA_URL": "set JIRA_URL to your Jira base URL in .env",
-    "JIRA_TOKEN": "create a personal access token in your Jira profile, then export JIRA_TOKEN in your shell profile",
-    "GITHUB_PERSONAL_ACCESS_TOKEN": "create a token at github.com/settings/tokens (fine-grained, scoped to the repos you use), then export GITHUB_PERSONAL_ACCESS_TOKEN in your shell profile",
+    "JIRA_TOKEN": "create a personal access token in your Jira profile, then store it in the Keychain and export JIRA_TOKEN from your shell profile (README.md)",
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "create a token at github.com/settings/tokens (fine-grained, scoped to the repos you use), then store it in the Keychain and export GITHUB_PERSONAL_ACCESS_TOKEN from your shell profile (README.md)",
 }
 
 # How to get a server's command onto PATH, for commands that are not part of the
@@ -268,7 +268,7 @@ def build_command(
         elif is_secret(key) and key in file_keys:
             problem = (
                 f"{key} is only in the env file — the server reads it from the shell Claude "
-                f"Code starts in, so export {key} in your shell profile instead"
+                f"Code starts in, so store it in the Keychain and export {key} from your shell profile instead"
             )
         if problem and key in optional:
             notes.append(f"{problem}; until then that part of the server is unavailable")

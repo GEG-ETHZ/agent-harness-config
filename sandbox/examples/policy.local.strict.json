@@ -1,0 +1,23 @@
+{
+  "extends": "strict",
+  "filesystem": {
+    "allowRead": [
+      "~/.local/bin",
+      "~/.local/share/uv",
+      "~/.cache/uv"
+    ],
+    "allowWrite": [
+      "~/.cache/uv"
+    ]
+  },
+  "network": {
+    "allowedDomains": [
+      "github.com",
+      "api.github.com",
+      "*.githubusercontent.com",
+      "pypi.org",
+      "files.pythonhosted.org"
+    ]
+  },
+  "enableWeakerNetworkIsolation": true
+}
