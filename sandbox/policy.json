@@ -81,7 +81,6 @@
       "~/.claude/backups",
       "~/.claude/statsig",
       "~/.claude/telemetry",
-      "~/.claude/plugins",
       "~/.claude/history.jsonl",
       "~/.claude/.credentials.json",
       "~/.claude/.last-cleanup",

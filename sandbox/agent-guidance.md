@@ -17,8 +17,8 @@ What it blocks:
 - Writes outside the project, `/tmp`, Claude Code's own session state and the
   download caches. Other projects are readable, not writable. Global installs
   (`brew`, `npm -g`, `pip --user`, `uv tool install`) fail.
-- Writes to `~/.claude/settings.json`, hooks, rules, skills, agents, commands
-  and `CLAUDE.md` in `~/.claude`, and to `.git/hooks`, `.git/config` and
+- Writes to `~/.claude/settings.json`, hooks, rules, skills, agents, commands,
+  plugins and `CLAUDE.md` in `~/.claude`, and to `.git/hooks`, `.git/config` and
   `.vscode` in the project.
 - Reading credentials: `~/.ssh`, `~/.aws`, `~/.config/gcloud`, `~/.config/gh`,
   `~/.gnupg`, `~/.netrc`, the Keychain, `.env` files, shell histories, and the

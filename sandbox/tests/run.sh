@@ -271,6 +271,8 @@ expect_block "edit Claude settings"         ': >> ~/.claude/settings.json'
 expect_block "delete VS Code's lock files"  'mkdir -p ~/.claude/ide && touch ~/.claude/ide/srt-probe.lock' \
   'rm -f ~/.claude/ide/srt-probe.lock'
 expect_block "edit a hook script"           ': >> ~/.claude/scripts/hooks/block-no-verify.js'
+expect_block "install a Claude plugin"      'mkdir -p ~/.claude/plugins/srt-probe' \
+  'rmdir ~/.claude/plugins/srt-probe'
 expect_block "write a user rule"            'touch ~/.claude/rules/srt-probe.md' \
   'rm -f ~/.claude/rules/srt-probe.md'
 expect_block "write a user skill"           'mkdir -p ~/.claude/skills/srt-probe' \
@@ -299,8 +301,6 @@ if [[ $PROFILE == strict ]]; then
   expect_block_checked "read other projects' Claude transcripts" 'ls ~/.claude/projects/*/'
   expect_block "write another project's Claude memory" \
     'mkdir -p ~/.claude/projects/srt-probe' 'rmdir ~/.claude/projects/srt-probe'
-  expect_block "install a Claude plugin"   'mkdir -p ~/.claude/plugins/srt-probe' \
-    'rmdir ~/.claude/plugins/srt-probe'
   expect_block_checked "read Claude's login file" 'cat ~/.claude/.credentials.json'
 fi
 

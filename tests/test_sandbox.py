@@ -298,3 +298,9 @@ def test_session_settings_turn_off_the_bash_sandbox_and_show_the_status():
     hook = settings["hooks"]["SessionStart"][0]["hooks"][0]
     assert settings["sandbox"] == {"enabled": False}
     assert "$CLAUDE_SB_SESSION_MESSAGE" in hook["command"]
+
+
+def test_supervised_keeps_plugins_closed():
+    # Plugins bring hooks that run later in plain claude, outside the sandbox.
+    for name in ("policy.json", "policy.strict.json"):
+        assert not any("plugins" in entry for entry in policy(name)["filesystem"]["allowWrite"])
