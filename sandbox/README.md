@@ -517,7 +517,9 @@ pins the `srt` version (`SRT_VERSION`) and refuses any other.
 ### When Claude is blocked
 
 `claude-sb` gives Claude `agent-guidance.md`: what the sandbox blocks, and
-that a block is handed to you, not worked around. A `SessionStart` hook (in
+that a block is handed to you, not worked around. A block stops the task:
+Claude does not reach the same result through a copy, a clone in `/tmp` or a
+change prepared for you to push. A `SessionStart` hook (in
 `--settings`, for this session only) prints it, and Claude Code adds it to the
 context at the start and again after `/clear` and `/compact`. It is a hook,
 not `--append-system-prompt-file`, because the VS Code extension sends its own
