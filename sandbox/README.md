@@ -239,7 +239,9 @@ Three rules:
    under it. Open the one folder your tool needs.
 2. **What a tool writes, it must also read.** Put every `allowWrite` path in
    `allowRead` too, or the tool fails with `Operation not permitted`.
-3. **The file only adds.** It cannot remove anything from the profile.
+3. **The file extends, it cannot remove.** Lists are extended and single
+   settings (`true`/`false`, numbers) are replaced, but no entry of the
+   profile can be removed.
 
 `make sandbox-policy` shows the policy `claude-sb` will run with. To go back
 to supervised, delete the file.
