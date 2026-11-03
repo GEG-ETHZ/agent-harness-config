@@ -42,10 +42,12 @@ _CLAUDE_SB_TOKEN_SERVICE="claude-sb-oauth"
 # Jira). Their tool calls show in the session and go through auto mode's
 # checks, so a watching person sees what the agent does with them.
 #
-# Two variables keep MCP servers working inside the sandbox:
+# Three variables keep uv and MCP servers working inside the sandbox:
 # - uvx takes a lock in its tool folder (~/.local/share/uv/tools), which is
 #   closed so that `uv tool install` cannot install globally; uvx gets its
 #   own tool folder in the cache instead.
+# - uv caches in ~/.cache/uv, the folder the strict example opens. Older uv
+#   versions default to ~/Library/Caches/uv on macOS, which strict keeps closed.
 # - fastmcp-based servers read .env from the project folder and crash when
 #   the sandbox denies it, instead of skipping it.
 #
@@ -59,6 +61,7 @@ _CLAUDE_SB_TOKEN_SERVICE="claude-sb-oauth"
 # If the token ever gets Contents: write, push works too; tests/run.sh checks.
 _CLAUDE_SB_GIT_HELPER='!f() { echo username=x-access-token; echo "password=$GITHUB_PERSONAL_ACCESS_TOKEN"; }; f'
 _CLAUDE_SB_ENV=(UV_TOOL_DIR="$HOME/.cache/claude-sb/uv-tools"
+  UV_CACHE_DIR="$HOME/.cache/uv"
   FASTMCP_ENV_FILE=/dev/null
   GIT_CONFIG_COUNT=4
   GIT_CONFIG_KEY_0=credential.https://github.com.helper GIT_CONFIG_VALUE_0=
@@ -66,11 +69,26 @@ _CLAUDE_SB_ENV=(UV_TOOL_DIR="$HOME/.cache/claude-sb/uv-tools"
   GIT_CONFIG_KEY_2=url.https://github.com/.insteadOf GIT_CONFIG_VALUE_2=git@github.com:
   GIT_CONFIG_KEY_3=url.https://github.com/.insteadOf GIT_CONFIG_VALUE_3=ssh://git@github.com/)
 
-# With the network open, srt allows every socket, local ones included: the
-# ssh-agent would sign with your keys although ~/.ssh is closed, and a Docker
-# socket would let a container mount ~. Removing the variables stops tools
-# from finding them; it does not hide the sockets from a deliberate search.
-_CLAUDE_SB_UNSET=(SSH_AUTH_SOCK SSH_AGENT_PID DOCKER_HOST)
+# Variables removed before the sandbox starts. Every other exported variable
+# reaches the sandbox, tokens included; which ones a session gets is up to the
+# person starting it (README.md, "Remove tokens from the sandbox").
+#
+# - The sockets: with the network open, srt allows every socket, local ones
+#   included. The ssh-agent would sign with your keys although ~/.ssh is
+#   closed, and a Docker socket would let a container mount ~. Removing the
+#   variables stops tools from finding them; it does not hide the sockets
+#   from a deliberate search.
+# - Common tokens nothing inside needs. gh does not start inside, but any
+#   other client could use GH_TOKEN, and with write access push around the
+#   read-only GitHub token. The tokens the session needs stay:
+#   CLAUDE_CODE_OAUTH_TOKEN and the MCP servers' (GITHUB_PERSONAL_ACCESS_TOKEN,
+#   CONFLUENCE_TOKEN, JIRA_TOKEN).
+# - CLAUDE_SB_UNSET: your own names, separated by spaces. Set it in
+#   ~/.zprofile, which both the terminal and the VS Code wrapper read.
+_CLAUDE_SB_UNSET=(SSH_AUTH_SOCK SSH_AGENT_PID DOCKER_HOST
+  GH_TOKEN GITHUB_TOKEN GITLAB_TOKEN HF_TOKEN NPM_TOKEN OPENAI_API_KEY
+  AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+  ${=CLAUDE_SB_UNSET:-})
 
 # Settings for every sandboxed session: Claude Code's own Bash sandbox off, and
 # two hooks. SessionStart prints CLAUDE_SB_GUIDANCE, which Claude Code adds to
@@ -158,7 +176,8 @@ _claude_sb_launch() {
   local github_token=${GITHUB_PERSONAL_ACCESS_TOKEN:-}
   if [[ -n $github_token && $github_token != github_pat_* ]]; then
     print -u2 "claude-sb: GITHUB_PERSONAL_ACCESS_TOKEN is not a fine-grained token (it starts with ${github_token[1,4]}), so it may push code."
-    print -u2 "  Use a fine-grained token with Contents: read (see sandbox/README.md, Set up)."
+    print -u2 "  Use a fine-grained token with Contents: Read-only (see sandbox/README.md, Set up)."
+    print -u2 "  claude-sb only checks the kind of token; that it cannot write code is up to you."
     return 1
   fi
   if ! command -v srt >/dev/null 2>&1; then
@@ -216,6 +235,17 @@ _claude_sb_launch() {
     node "$_CLAUDE_SB_RUNNER" "$srt_dist" "$_CLAUDE_SB_POLICY" $local_args -- \
     $claude_cmd $session_args "$@"
 }
+
+# An alias of the same name, from an earlier setup, would stop the functions
+# below from loading and keep running whatever it points to. zsh runs each
+# command before it reads the next, so removing it here is in time.
+for _claude_sb_name in claude-sb claude-sb-vscode; do
+  if (( ${+aliases[$_claude_sb_name]} )); then
+    print -u2 "claude-sb: removed the alias $_claude_sb_name (${aliases[$_claude_sb_name]}); delete it from your shell startup files."
+    unalias $_claude_sb_name
+  fi
+done
+unset _claude_sb_name
 
 claude-sb() {
   if [[ $# -gt 0 && $1 != -* ]]; then

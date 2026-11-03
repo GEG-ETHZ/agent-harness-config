@@ -91,10 +91,10 @@ function readJson(path, what) {
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-// The personal policy only adds: lists are extended (entries already there
-// are not repeated), objects are merged key by key, and a single value
-// (true/false, a number) replaces the shared one. Nothing in the shared
-// policy can be removed this way, so stricter means adding entries.
+// The personal policy extends, it cannot remove: lists are extended (entries
+// already there are not repeated), objects are merged key by key, and a
+// single value (true/false, a number) replaces the shared one. Nothing in the
+// shared policy can be removed this way, so stricter means adding entries.
 export function mergePolicy(shared, local) {
   if (Array.isArray(shared) && Array.isArray(local)) {
     return [...shared, ...local.filter((entry) => !shared.includes(entry))];

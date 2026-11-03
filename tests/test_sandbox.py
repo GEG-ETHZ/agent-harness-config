@@ -292,6 +292,70 @@ def test_launcher_accepts_a_fine_grained_github_token():
     assert "not a fine-grained token" not in result.stderr
 
 
+def removed_variables(env: dict[str, str] | None = None) -> list[str]:
+    return wrapper("print -rl -- $_CLAUDE_SB_UNSET", env).stdout.split()
+
+
+def test_launcher_removes_github_tokens_nothing_inside_needs():
+    # gh does not start inside, but any other client could use these tokens.
+    assert {"GH_TOKEN", "GITHUB_TOKEN"} <= set(removed_variables())
+
+
+def test_launcher_keeps_the_tokens_the_session_needs():
+    needed = {
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "CONFLUENCE_TOKEN",
+        "JIRA_TOKEN",
+    }
+
+    assert needed.isdisjoint(removed_variables())
+
+
+def test_personal_names_are_removed_too():
+    # Arrange
+    env = {"CLAUDE_SB_UNSET": "MY_SERVICE_TOKEN DATABASE_URL"}
+
+    # Act
+    removed = removed_variables(env)
+
+    # Assert
+    assert removed[-2:] == ["MY_SERVICE_TOKEN", "DATABASE_URL"]
+    assert "GH_TOKEN" in removed
+
+
+def test_an_old_alias_gives_way_with_a_warning():
+    # An alias of the same name would stop the file from loading and keep
+    # running whatever it pointed to.
+    if shutil.which("zsh") is None:
+        pytest.skip("zsh not installed")
+    aliases = "alias claude-sb='echo old'; alias claude-sb-vscode='echo old'"
+    load = f"source {SANDBOX / 'claude-sb.zsh'}"
+
+    result = subprocess.run(
+        ["zsh", "-c", f"{aliases}; {load} && whence -w claude-sb claude-sb-vscode"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.split() == ["claude-sb:", "function", "claude-sb-vscode:", "function"]
+    assert "removed the alias claude-sb" in result.stderr
+
+
+def session_env() -> dict[str, str]:
+    lines = wrapper("print -rl -- $_CLAUDE_SB_ENV").stdout.splitlines()
+    return dict(line.split("=", 1) for line in lines)
+
+
+def test_uv_caches_where_the_strict_example_opens():
+    # Older uv versions default to ~/Library/Caches/uv on macOS.
+    example = json.loads((SANDBOX / "examples" / "policy.local.strict.json").read_text())
+
+    assert session_env()["UV_CACHE_DIR"] == f"{os.environ['HOME']}/.cache/uv"
+    assert "~/.cache/uv" in example["filesystem"]["allowWrite"]
+
+
 def session_settings() -> dict:
     return json.loads(wrapper("print -r -- $_CLAUDE_SB_SETTINGS").stdout)
 

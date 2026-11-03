@@ -3,8 +3,9 @@
 #
 # Usage: sandbox/tests/run.sh [policy] [launcher] [wrapper]
 #        (defaults: the installed copies in ~/.config/claude-sb/)
-#        CLAUDE_SB_TEST_REPO=git@github.com:owner/private-repo.git also probes
-#        git fetch and push.
+#        git fetch and push are probed on this checkout's own GitHub remote
+#        when GITHUB_PERSONAL_ACCESS_TOKEN can read it, or on
+#        CLAUDE_SB_TEST_REPO=git@github.com:owner/private-repo.git.
 #        Your personal policy (~/.config/claude-sb/policy.local.json, or
 #        CLAUDE_SB_LOCAL_POLICY) is merged in, as claude-sb does; with a network
 #        block in it, hosts outside its allowedDomains must be blocked. With
@@ -35,9 +36,26 @@ RUNNER=${2:-$HOME/.config/claude-sb/claude-sb-run.mjs}
 WRAPPER=${3:-$HOME/.config/claude-sb/claude-sb.zsh}
 LOCAL_POLICY=${CLAUDE_SB_LOCAL_POLICY:-$HOME/.config/claude-sb/policy.local.json}
 NETWORK_TIMEOUT_SECONDS=5
+
+# own_github_repo: this checkout's GitHub remote as an SSH URL, if the token
+# can read it. Checked outside the sandbox, with the token passed to curl on
+# stdin so it never shows in the process list. Prints nothing otherwise.
+own_github_repo() {
+  local url slug
+  [[ -n ${GITHUB_PERSONAL_ACCESS_TOKEN:-} ]] || return 0
+  url=$(git -C "$(dirname "$0")" remote get-url origin 2>/dev/null) || return 0
+  slug=$(sed -nE 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+)$#\2#p' <<<"$url")
+  slug=${slug%.git}
+  [[ -n $slug ]] || return 0
+  printf 'header = "Authorization: Bearer %s"\n' "$GITHUB_PERSONAL_ACCESS_TOKEN" |
+    curl -fsS -o /dev/null --max-time "$NETWORK_TIMEOUT_SECONDS" -K - \
+      "https://api.github.com/repos/$slug" 2>/dev/null || return 0
+  printf 'git@github.com:%s.git\n' "$slug"
+}
+
 # A private repo the GitHub MCP token can read, as an SSH URL
 # (git@github.com:owner/repo.git); fetch and push are probed on it.
-PRIVATE_REPO=${CLAUDE_SB_TEST_REPO:-}
+PRIVATE_REPO=${CLAUDE_SB_TEST_REPO:-$(own_github_repo)}
 SANDBOX_DENIAL='Operation not permitted'
 # With a network filter, srt's proxy refuses a host outside allowedDomains.
 PROXY_DENIAL='response 403|Operation not permitted|Could not resolve|Failed to connect'
@@ -262,6 +280,15 @@ expect_block_checked "read ~/Desktop"           'ls ~/Desktop'
 expect_block_checked "read Mail"                'ls ~/Library/Mail'
 expect_block_checked "read browser cookies"     'ls ~/Library/Cookies'
 expect_block_checked "use the ssh-agent"        'ssh-add -l >/dev/null'
+# Exported in the shell claude-sb starts from, the way a ~/.zshrc would, and
+# expected gone inside. A token still set is a hole, not a denial message.
+if GH_TOKEN=srt-probe GITHUB_TOKEN=srt-probe \
+  sandboxed '[ -z "${GH_TOKEN:-}${GITHUB_TOKEN:-}" ]' >/dev/null; then
+  printf 'ok    block  %s\n' "GH_TOKEN and GITHUB_TOKEN removed"
+else
+  printf 'FAIL  block  %s\n' "GH_TOKEN and GITHUB_TOKEN removed"
+  block_failures=$((block_failures + 1))
+fi
 expect_profile_work "npm runs (~/.npmrc closed)" 'npm config get registry >/dev/null'
 expect_block_checked "read the gh token (Keychain)" \
   'security find-generic-password -s gh:github.com -w >/dev/null'
@@ -364,7 +391,7 @@ expect_profile_work "Go TLS (gh api, GitHub MCP)" \
 
 echo "-- GitHub through git (the MCP token: read code, never write)"
 if [[ -z ${GITHUB_PERSONAL_ACCESS_TOKEN:-} || -z $PRIVATE_REPO ]]; then
-  printf 'skip  core   git fetch / push probes (GITHUB_PERSONAL_ACCESS_TOKEN or CLAUDE_SB_TEST_REPO not set)\n'
+  printf 'skip  core   git fetch / push probes (no GITHUB_PERSONAL_ACCESS_TOKEN, or it cannot read this repo; set CLAUDE_SB_TEST_REPO)\n'
   skipped=$((skipped + 1))
   untested+=("git push is refused")
 else

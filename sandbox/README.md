@@ -65,7 +65,9 @@ from `brew install node`).
 
    This installs the sandbox runtime, copies `claude-sb` to
    `~/.config/claude-sb/`, and adds a line to `~/.zshrc` that loads the
-   `claude-sb` command.
+   `claude-sb` command. If you have an older alias called `claude-sb`, the
+   command removes it when it loads and says so; delete the alias from your
+   startup files.
 
 2. **Give it a login for Claude Code.** The sandbox cannot open the Keychain,
    where Claude Code normally keeps your login, so `claude-sb` uses a separate
@@ -91,7 +93,9 @@ from `brew install node`).
       Workflows. For the GitHub MCP server, the same token can also get
       Issues and Pull requests: Read and write. `claude-sb` refuses any other
       kind of token: only a fine-grained one (`github_pat_...`) can be
-      limited to reading code.
+      limited to reading code. It cannot tell whether yours is: a
+      fine-grained token with Contents: Read and write passes too. Setting
+      Read-only is up to you, and `make sandbox-test` (step 6) checks it.
    2. Store it in the Keychain, and export it from `~/.zprofile` (VS Code
       reads that file, not `~/.zshrc`):
 
@@ -124,8 +128,10 @@ from `brew install node`).
 
    It tries what the sandbox must block and the work it must allow. It works
    when the last line shows `holes: 0` and `core broken: 0`. In strict, work
-   you have not opened shows as `info`. To test git too, put the SSH URL of a
-   private repository your token can read in front:
+   you have not opened shows as `info`. With a GitHub token (step 3), it also
+   checks that git can fetch and that GitHub refuses a push, on this
+   repository if your token can read it. That needs the network. If your
+   token does not cover this repository, name one it does:
    `CLAUDE_SB_TEST_REPO=git@github.com:<owner>/<repo>.git make sandbox-test`.
 
 7. **Start it** in a project folder:
@@ -135,8 +141,10 @@ from `brew install node`).
    claude-sb
    ```
 
-   The first line shows the profile, where it may write and whether the
-   network is filtered.
+   After your first prompt, a message shows the profile, where it may write
+   and whether the network is filtered (`claude-sb: sandboxed (supervised)
+   ...`). The same line is printed on start, but Claude Code clears the
+   terminal right away.
 
 **Your other tokens** (Confluence, Jira, and the like) need no change, with
 one exception: export them from `~/.zprofile`, not only `~/.zshrc`, or the
@@ -231,7 +239,9 @@ Three rules:
    under it. Open the one folder your tool needs.
 2. **What a tool writes, it must also read.** Put every `allowWrite` path in
    `allowRead` too, or the tool fails with `Operation not permitted`.
-3. **The file only adds.** It cannot remove anything from the profile.
+3. **The file extends, it cannot remove.** Lists are extended and single
+   settings (`true`/`false`, numbers) are replaced, but no entry of the
+   profile can be removed.
 
 `make sandbox-policy` shows the policy `claude-sb` will run with. To go back
 to supervised, delete the file.
@@ -248,6 +258,45 @@ to supervised, delete the file.
 | an MCP server that logs in through the browser (OAuth) | `allowRead` and `allowWrite`: `~/.claude/.credentials.json`, plus the server's host |
 | aliases and functions from your shell | `allowRead`: `~/.zshrc` (keep tokens out of it) |
 | any other MCP server or website | its host in `allowedDomains` |
+
+### Remove tokens from the sandbox
+
+**Which tokens a session can use is your responsibility.** Every variable
+exported in the shell you start `claude-sb` from reaches the sandbox, tokens
+included, and anything inside can read and use them. The policy closes files,
+not variables.
+
+`claude-sb` removes a few variables before the sandbox starts: the ssh-agent
+and Docker sockets, and common tokens nothing inside needs (`GH_TOKEN`,
+`GITHUB_TOKEN`, `GITLAB_TOKEN`, `HF_TOKEN`, `NPM_TOKEN`, `OPENAI_API_KEY` and
+the AWS keys). It keeps the ones the session needs: `CLAUDE_CODE_OAUTH_TOKEN`
+and the MCP servers' tokens. The full list is `_CLAUDE_SB_UNSET` in
+`claude-sb.zsh`.
+
+To remove more, list their names in `CLAUDE_SB_UNSET` in `~/.zprofile`,
+separated by spaces:
+
+```bash
+# ~/.zprofile
+CLAUDE_SB_UNSET="MY_SERVICE_TOKEN DATABASE_URL"
+```
+
+Put it in `~/.zprofile`, not `~/.zshrc`: the VS Code wrapper reads only
+`~/.zprofile`. It applies the next time `claude-sb` starts, in a new terminal
+or after reloading the VS Code window. To check, run `! env` inside
+`claude-sb`: the names must be missing.
+
+A name that should be removed for everyone belongs in `_CLAUDE_SB_UNSET` in
+`sandbox/claude-sb.zsh`, through a pull request to this repository.
+
+Two things removing a variable does not cover:
+
+- **A token written in plain text in a shell startup file comes back.** A
+  shell started inside reads `~/.zprofile` and `~/.zshrc` again and exports it
+  anew, and in supervised the agent can read those files directly. Read tokens
+  from the Keychain there instead: inside the sandbox that read fails.
+- **Don't remove a token an MCP server needs.** The server then starts without
+  it and fails.
 
 ## Part 2: How it works
 
@@ -450,19 +499,24 @@ This is safe only while the token cannot write code: with Contents: Read-only,
 GitHub refuses `git push` ("Write access to repository not granted"). That is
 why `claude-sb` refuses every token that is not fine-grained (`github_pat_`):
 a classic token (`ghp_`) or the `gh` CLI's login (`gho_`) cannot be limited
-to reading. It is also why
-`make sandbox-test` checks that a push fails when `CLAUDE_SB_TEST_REPO` is
-set. Pull requests, issues and comments go through the GitHub MCP server.
+to reading. The prefix is all it can check: a fine-grained token with
+Contents: Read and write starts with `github_pat_` too, and GitHub has no API
+that lists a fine-grained token's permissions. Whether the token is read-only
+is up to you. `make sandbox-test` checks it by trying a push, on this
+repository if the token can read it (one API call outside the sandbox decides),
+otherwise on `CLAUDE_SB_TEST_REPO`; without either it skips the check and
+warns. Pull requests, issues and comments go through the GitHub MCP server.
 
 ### MCP servers
 
 All configured servers run inside the sandbox with their usual tokens; in
 strict, each also needs its host and its tool's exceptions. The wrapper sets
-two variables so they start:
+three variables so they and uv start:
 
 | Variable | Why |
 | --- | --- |
 | `UV_TOOL_DIR=~/.cache/claude-sb/uv-tools` | `uvx` takes a lock in its tool folder. The usual one, `~/.local/share/uv/tools`, stays closed so `uv tool install` cannot install globally. |
+| `UV_CACHE_DIR=~/.cache/uv` | The folder the strict example opens. Older uv versions default to `~/Library/Caches/uv` on macOS, which strict keeps closed. Current versions already use `~/.cache/uv`. |
 | `FASTMCP_ENV_FILE=/dev/null` | fastmcp-based servers read `.env` from the project folder and crash when the sandbox denies it. |
 
 Servers that log in through the browser (OAuth, for example Miro) work: the
@@ -550,11 +604,12 @@ documented here and that the scripts parse.
 What stays open, mostly because closing it would block ordinary work or is
 not possible from inside one sandbox:
 
-- **Tokens are readable inside.** The MCP tokens and `CLAUDE_CODE_OAUTH_TOKEN`
-  are environment variables, and in supervised the browser logins of MCP
-  servers are readable in `~/.claude/.credentials.json`. Claude Code and the
-  commands it runs share one sandbox, so anything Claude Code can read, they
-  can.
+- **Tokens are readable inside.** Every exported variable reaches the
+  sandbox, except the ones `claude-sb` removes (Remove tokens from the
+  sandbox). The MCP tokens and `CLAUDE_CODE_OAUTH_TOKEN` stay because the
+  session needs them, and in supervised the browser logins of MCP servers are
+  readable in `~/.claude/.credentials.json`. Claude Code and the commands it
+  runs share one sandbox, so anything Claude Code can read, they can.
 - **Shell startup files are readable** in supervised, because the shell inside
   reads them to set `PATH`. Keep tokens out of them in plain text, for example
   by reading them from the Keychain there: inside the sandbox that read fails.
