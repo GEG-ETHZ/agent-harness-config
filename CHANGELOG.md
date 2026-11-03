@@ -45,7 +45,9 @@ Run `make setup-user` again after `make update`.
   also reaches the VS Code panel. `make sandbox-install` shows a changed policy and asks
   before installing it. It removes `GH_TOKEN`, `GITHUB_TOKEN` and other common tokens
   nothing inside needs from the environment; add your own in `CLAUDE_SB_UNSET` in
-  `~/.zprofile`. Which other tokens reach the sandbox is up to you.
+  `~/.zprofile`. Which other tokens reach the sandbox is up to you. `make sandbox-test`
+  checks that GitHub refuses a push on this repository when your token can read it:
+  `claude-sb` only checks that the token is fine-grained, not that it is read-only.
   See `sandbox/README.md`.
 
 ## [v0.2.0] — 2026-10-04

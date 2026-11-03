@@ -91,7 +91,9 @@ from `brew install node`).
       Workflows. For the GitHub MCP server, the same token can also get
       Issues and Pull requests: Read and write. `claude-sb` refuses any other
       kind of token: only a fine-grained one (`github_pat_...`) can be
-      limited to reading code.
+      limited to reading code. It cannot tell whether yours is: a
+      fine-grained token with Contents: Read and write passes too. Setting
+      Read-only is up to you, and `make sandbox-test` (step 6) checks it.
    2. Store it in the Keychain, and export it from `~/.zprofile` (VS Code
       reads that file, not `~/.zshrc`):
 
@@ -124,8 +126,10 @@ from `brew install node`).
 
    It tries what the sandbox must block and the work it must allow. It works
    when the last line shows `holes: 0` and `core broken: 0`. In strict, work
-   you have not opened shows as `info`. To test git too, put the SSH URL of a
-   private repository your token can read in front:
+   you have not opened shows as `info`. With a GitHub token (step 3), it also
+   checks that git can fetch and that GitHub refuses a push, on this
+   repository if your token can read it. That needs the network. If your
+   token does not cover this repository, name one it does:
    `CLAUDE_SB_TEST_REPO=git@github.com:<owner>/<repo>.git make sandbox-test`.
 
 7. **Start it** in a project folder:
@@ -484,9 +488,13 @@ This is safe only while the token cannot write code: with Contents: Read-only,
 GitHub refuses `git push` ("Write access to repository not granted"). That is
 why `claude-sb` refuses every token that is not fine-grained (`github_pat_`):
 a classic token (`ghp_`) or the `gh` CLI's login (`gho_`) cannot be limited
-to reading. It is also why
-`make sandbox-test` checks that a push fails when `CLAUDE_SB_TEST_REPO` is
-set. Pull requests, issues and comments go through the GitHub MCP server.
+to reading. The prefix is all it can check: a fine-grained token with
+Contents: Read and write starts with `github_pat_` too, and GitHub has no API
+that lists a fine-grained token's permissions. Whether the token is read-only
+is up to you. `make sandbox-test` checks it by trying a push, on this
+repository if the token can read it (one API call outside the sandbox decides),
+otherwise on `CLAUDE_SB_TEST_REPO`; without either it skips the check and
+warns. Pull requests, issues and comments go through the GitHub MCP server.
 
 ### MCP servers
 

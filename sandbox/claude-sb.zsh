@@ -173,7 +173,8 @@ _claude_sb_launch() {
   local github_token=${GITHUB_PERSONAL_ACCESS_TOKEN:-}
   if [[ -n $github_token && $github_token != github_pat_* ]]; then
     print -u2 "claude-sb: GITHUB_PERSONAL_ACCESS_TOKEN is not a fine-grained token (it starts with ${github_token[1,4]}), so it may push code."
-    print -u2 "  Use a fine-grained token with Contents: read (see sandbox/README.md, Set up)."
+    print -u2 "  Use a fine-grained token with Contents: Read-only (see sandbox/README.md, Set up)."
+    print -u2 "  claude-sb only checks the kind of token; that it cannot write code is up to you."
     return 1
   fi
   if ! command -v srt >/dev/null 2>&1; then
