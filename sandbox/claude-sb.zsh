@@ -66,11 +66,26 @@ _CLAUDE_SB_ENV=(UV_TOOL_DIR="$HOME/.cache/claude-sb/uv-tools"
   GIT_CONFIG_KEY_2=url.https://github.com/.insteadOf GIT_CONFIG_VALUE_2=git@github.com:
   GIT_CONFIG_KEY_3=url.https://github.com/.insteadOf GIT_CONFIG_VALUE_3=ssh://git@github.com/)
 
-# With the network open, srt allows every socket, local ones included: the
-# ssh-agent would sign with your keys although ~/.ssh is closed, and a Docker
-# socket would let a container mount ~. Removing the variables stops tools
-# from finding them; it does not hide the sockets from a deliberate search.
-_CLAUDE_SB_UNSET=(SSH_AUTH_SOCK SSH_AGENT_PID DOCKER_HOST)
+# Variables removed before the sandbox starts. Every other exported variable
+# reaches the sandbox, tokens included; which ones a session gets is up to the
+# person starting it (README.md, "Remove tokens from the sandbox").
+#
+# - The sockets: with the network open, srt allows every socket, local ones
+#   included. The ssh-agent would sign with your keys although ~/.ssh is
+#   closed, and a Docker socket would let a container mount ~. Removing the
+#   variables stops tools from finding them; it does not hide the sockets
+#   from a deliberate search.
+# - Common tokens nothing inside needs. gh does not start inside, but any
+#   other client could use GH_TOKEN, and with write access push around the
+#   read-only GitHub token. The tokens the session needs stay:
+#   CLAUDE_CODE_OAUTH_TOKEN and the MCP servers' (GITHUB_PERSONAL_ACCESS_TOKEN,
+#   CONFLUENCE_TOKEN, JIRA_TOKEN).
+# - CLAUDE_SB_UNSET: your own names, separated by spaces. Set it in
+#   ~/.zprofile, which both the terminal and the VS Code wrapper read.
+_CLAUDE_SB_UNSET=(SSH_AUTH_SOCK SSH_AGENT_PID DOCKER_HOST
+  GH_TOKEN GITHUB_TOKEN GITLAB_TOKEN HF_TOKEN NPM_TOKEN OPENAI_API_KEY
+  AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+  ${=CLAUDE_SB_UNSET:-})
 
 # Settings for every sandboxed session: Claude Code's own Bash sandbox off, and
 # two hooks. SessionStart prints CLAUDE_SB_GUIDANCE, which Claude Code adds to

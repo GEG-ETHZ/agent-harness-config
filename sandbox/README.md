@@ -249,6 +249,45 @@ to supervised, delete the file.
 | aliases and functions from your shell | `allowRead`: `~/.zshrc` (keep tokens out of it) |
 | any other MCP server or website | its host in `allowedDomains` |
 
+### Remove tokens from the sandbox
+
+**Which tokens a session can use is your responsibility.** Every variable
+exported in the shell you start `claude-sb` from reaches the sandbox, tokens
+included, and anything inside can read and use them. The policy closes files,
+not variables.
+
+`claude-sb` removes a few variables before the sandbox starts: the ssh-agent
+and Docker sockets, and common tokens nothing inside needs (`GH_TOKEN`,
+`GITHUB_TOKEN`, `GITLAB_TOKEN`, `HF_TOKEN`, `NPM_TOKEN`, `OPENAI_API_KEY` and
+the AWS keys). It keeps the ones the session needs: `CLAUDE_CODE_OAUTH_TOKEN`
+and the MCP servers' tokens. The full list is `_CLAUDE_SB_UNSET` in
+`claude-sb.zsh`.
+
+To remove more, list their names in `CLAUDE_SB_UNSET` in `~/.zprofile`,
+separated by spaces:
+
+```bash
+# ~/.zprofile
+CLAUDE_SB_UNSET="MY_SERVICE_TOKEN DATABASE_URL"
+```
+
+Put it in `~/.zprofile`, not `~/.zshrc`: the VS Code wrapper reads only
+`~/.zprofile`. It applies the next time `claude-sb` starts, in a new terminal
+or after reloading the VS Code window. To check, run `! env` inside
+`claude-sb`: the names must be missing.
+
+A name that should be removed for everyone belongs in `_CLAUDE_SB_UNSET` in
+`sandbox/claude-sb.zsh`, through a pull request to this repository.
+
+Two things removing a variable does not cover:
+
+- **A token written in plain text in a shell startup file comes back.** A
+  shell started inside reads `~/.zprofile` and `~/.zshrc` again and exports it
+  anew, and in supervised the agent can read those files directly. Read tokens
+  from the Keychain there instead: inside the sandbox that read fails.
+- **Don't remove a token an MCP server needs.** The server then starts without
+  it and fails.
+
 ## Part 2: How it works
 
 ### What it protects against, and what not
@@ -543,11 +582,12 @@ documented here and that the scripts parse.
 What stays open, mostly because closing it would block ordinary work or is
 not possible from inside one sandbox:
 
-- **Tokens are readable inside.** The MCP tokens and `CLAUDE_CODE_OAUTH_TOKEN`
-  are environment variables, and in supervised the browser logins of MCP
-  servers are readable in `~/.claude/.credentials.json`. Claude Code and the
-  commands it runs share one sandbox, so anything Claude Code can read, they
-  can.
+- **Tokens are readable inside.** Every exported variable reaches the
+  sandbox, except the ones `claude-sb` removes (Remove tokens from the
+  sandbox). The MCP tokens and `CLAUDE_CODE_OAUTH_TOKEN` stay because the
+  session needs them, and in supervised the browser logins of MCP servers are
+  readable in `~/.claude/.credentials.json`. Claude Code and the commands it
+  runs share one sandbox, so anything Claude Code can read, they can.
 - **Shell startup files are readable** in supervised, because the shell inside
   reads them to set `PATH`. Keep tokens out of them in plain text, for example
   by reading them from the Keychain there: inside the sandbox that read fails.

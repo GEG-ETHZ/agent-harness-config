@@ -292,6 +292,38 @@ def test_launcher_accepts_a_fine_grained_github_token():
     assert "not a fine-grained token" not in result.stderr
 
 
+def removed_variables(env: dict[str, str] | None = None) -> list[str]:
+    return wrapper("print -rl -- $_CLAUDE_SB_UNSET", env).stdout.split()
+
+
+def test_launcher_removes_github_tokens_nothing_inside_needs():
+    # gh does not start inside, but any other client could use these tokens.
+    assert {"GH_TOKEN", "GITHUB_TOKEN"} <= set(removed_variables())
+
+
+def test_launcher_keeps_the_tokens_the_session_needs():
+    needed = {
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "CONFLUENCE_TOKEN",
+        "JIRA_TOKEN",
+    }
+
+    assert needed.isdisjoint(removed_variables())
+
+
+def test_personal_names_are_removed_too():
+    # Arrange
+    env = {"CLAUDE_SB_UNSET": "MY_SERVICE_TOKEN DATABASE_URL"}
+
+    # Act
+    removed = removed_variables(env)
+
+    # Assert
+    assert removed[-2:] == ["MY_SERVICE_TOKEN", "DATABASE_URL"]
+    assert "GH_TOKEN" in removed
+
+
 def session_settings() -> dict:
     return json.loads(wrapper("print -r -- $_CLAUDE_SB_SETTINGS").stdout)
 

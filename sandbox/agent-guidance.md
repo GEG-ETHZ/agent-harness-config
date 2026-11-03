@@ -23,7 +23,8 @@ What it blocks:
 - Reading credentials: `~/.ssh`, `~/.aws`, `~/.config/gcloud`, `~/.config/gh`,
   `~/.gnupg`, `~/.netrc`, the Keychain, `.env` files, shell histories, and the
   logins of git, package registries, containers and other tools. `gh` does not
-  start, and the ssh-agent and Docker are not available.
+  start, the ssh-agent and Docker are not available, and tokens such as
+  `GH_TOKEN` are removed from the environment.
 - Reading private folders: Documents, Desktop, Downloads, photos, mail,
   messages, browser profiles. Ask the user to copy a file into the project.
 - In the strict profile (the start line names it), everything in `~` outside

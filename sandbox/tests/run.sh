@@ -262,6 +262,15 @@ expect_block_checked "read ~/Desktop"           'ls ~/Desktop'
 expect_block_checked "read Mail"                'ls ~/Library/Mail'
 expect_block_checked "read browser cookies"     'ls ~/Library/Cookies'
 expect_block_checked "use the ssh-agent"        'ssh-add -l >/dev/null'
+# Exported in the shell claude-sb starts from, the way a ~/.zshrc would, and
+# expected gone inside. A token still set is a hole, not a denial message.
+if GH_TOKEN=srt-probe GITHUB_TOKEN=srt-probe \
+  sandboxed '[ -z "${GH_TOKEN:-}${GITHUB_TOKEN:-}" ]' >/dev/null; then
+  printf 'ok    block  %s\n' "GH_TOKEN and GITHUB_TOKEN removed"
+else
+  printf 'FAIL  block  %s\n' "GH_TOKEN and GITHUB_TOKEN removed"
+  block_failures=$((block_failures + 1))
+fi
 expect_profile_work "npm runs (~/.npmrc closed)" 'npm config get registry >/dev/null'
 expect_block_checked "read the gh token (Keychain)" \
   'security find-generic-password -s gh:github.com -w >/dev/null'
