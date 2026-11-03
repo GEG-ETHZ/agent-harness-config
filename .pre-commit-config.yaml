@@ -16,6 +16,10 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
       - id: end-of-file-fixer
+        # This hook opens every file for writing, even one that needs no fix, and the
+        # claude-sb sandbox never lets .vscode/ be written, so `make check` failed there.
+        # The other fixers only write when they change something.
+        exclude: '^\.vscode/'
       - id: mixed-line-ending
         args: [--fix=lf]
       - id: trailing-whitespace
