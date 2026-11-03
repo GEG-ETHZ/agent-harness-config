@@ -233,6 +233,17 @@ _claude_sb_launch() {
     $claude_cmd $session_args "$@"
 }
 
+# An alias of the same name, from an earlier setup, would stop the functions
+# below from loading and keep running whatever it points to. zsh runs each
+# command before it reads the next, so removing it here is in time.
+for _claude_sb_name in claude-sb claude-sb-vscode; do
+  if (( ${+aliases[$_claude_sb_name]} )); then
+    print -u2 "claude-sb: removed the alias $_claude_sb_name (${aliases[$_claude_sb_name]}); delete it from your shell startup files."
+    unalias $_claude_sb_name
+  fi
+done
+unset _claude_sb_name
+
 claude-sb() {
   if [[ $# -gt 0 && $1 != -* ]]; then
     _claude_sb_launch claude "$@"

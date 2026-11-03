@@ -65,7 +65,9 @@ from `brew install node`).
 
    This installs the sandbox runtime, copies `claude-sb` to
    `~/.config/claude-sb/`, and adds a line to `~/.zshrc` that loads the
-   `claude-sb` command.
+   `claude-sb` command. If you have an older alias called `claude-sb`, the
+   command removes it when it loads and says so; delete the alias from your
+   startup files.
 
 2. **Give it a login for Claude Code.** The sandbox cannot open the Keychain,
    where Claude Code normally keeps your login, so `claude-sb` uses a separate

@@ -324,6 +324,25 @@ def test_personal_names_are_removed_too():
     assert "GH_TOKEN" in removed
 
 
+def test_an_old_alias_gives_way_with_a_warning():
+    # An alias of the same name would stop the file from loading and keep
+    # running whatever it pointed to.
+    if shutil.which("zsh") is None:
+        pytest.skip("zsh not installed")
+    aliases = "alias claude-sb='echo old'; alias claude-sb-vscode='echo old'"
+    load = f"source {SANDBOX / 'claude-sb.zsh'}"
+
+    result = subprocess.run(
+        ["zsh", "-c", f"{aliases}; {load} && whence -w claude-sb claude-sb-vscode"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.split() == ["claude-sb:", "function", "claude-sb-vscode:", "function"]
+    assert "removed the alias claude-sb" in result.stderr
+
+
 def session_settings() -> dict:
     return json.loads(wrapper("print -r -- $_CLAUDE_SB_SETTINGS").stdout)
 
