@@ -204,7 +204,7 @@ sandbox-install: ## Install claude-sb (macOS): the pinned srt, the files in ~/.c
 		echo "  security add-generic-password -U -s claude-sb-oauth -a \"\$$USER\" -w"; }
 	@echo; echo "Installed. Open a new terminal, or: source ~/.config/claude-sb/claude-sb.zsh"
 
-sandbox-test: ## Probe the claude-sb policy in sandbox/ (macOS); CLAUDE_SB_TEST_REPO=<ssh url> adds git
+sandbox-test: ## Probe the claude-sb policy in sandbox/ (macOS); git on this repo, or CLAUDE_SB_TEST_REPO=<ssh url>
 	sandbox/tests/run.sh sandbox/policy.json sandbox/claude-sb-run.mjs sandbox/claude-sb.zsh
 
 sandbox-policy: ## Show the policy claude-sb runs with: sandbox/policy.json plus your policy.local.json
