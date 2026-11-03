@@ -141,8 +141,10 @@ from `brew install node`).
    claude-sb
    ```
 
-   The first line shows the profile, where it may write and whether the
-   network is filtered.
+   After your first prompt, a message shows the profile, where it may write
+   and whether the network is filtered (`claude-sb: sandboxed (supervised)
+   ...`). The same line is printed on start, but Claude Code clears the
+   terminal right away.
 
 **Your other tokens** (Confluence, Jira, and the like) need no change, with
 one exception: export them from `~/.zprofile`, not only `~/.zshrc`, or the
