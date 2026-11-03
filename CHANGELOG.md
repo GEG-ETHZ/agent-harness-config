@@ -11,6 +11,11 @@ library with an API.
 
 Run `make setup-user` again after `make update`.
 
+- claude-sb: supervised also closes the Postgres, MySQL and mongosh credential files
+  (`~/.pgpass`, `~/.my.cnf`, `~/.mongodb`), and both profiles stop the agent from
+  overwriting `.env`, `.env.local` and `.env.*.local`, which it cannot read.
+  `.env.example` stays writable. Run `make sandbox-install` to pick it up.
+
 - The deny rule for `gcloud ... delete` now matches. It was written as
   `Bash(gcloud * delete:*)`, which Claude Code reads as a literal prefix, so deletes were
   never blocked and Claude Code warned on every start. `make setup-user` replaces it with

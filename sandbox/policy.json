@@ -27,6 +27,9 @@
       "~/.config/glab-cli",
       "~/.databrickscfg",
       "~/.cache/huggingface/token",
+      "~/.pgpass",
+      "~/.my.cnf",
+      "~/.mongodb",
       "~/.docker",
       "~/.colima",
       "~/.orbstack",
@@ -95,7 +98,10 @@
     ],
     "denyWrite": [
       "~/.claude/settings.json",
-      "~/.claude/scripts"
+      "~/.claude/scripts",
+      "/**/.env",
+      "/**/.env.local",
+      "/**/.env.*.local"
     ]
   },
   "allowAppleEvents": false,
