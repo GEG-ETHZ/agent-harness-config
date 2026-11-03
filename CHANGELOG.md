@@ -46,9 +46,10 @@ Run `make setup-user` again after `make update`.
   before installing it. It removes `GH_TOKEN`, `GITHUB_TOKEN` and other common tokens
   nothing inside needs from the environment; add your own in `CLAUDE_SB_UNSET` in
   `~/.zprofile`. Which other tokens reach the sandbox is up to you. An older `claude-sb`
-  alias is removed with a warning when the command loads. `make sandbox-test` checks that
-  GitHub refuses a push on this repository when your token can read it: `claude-sb` only
-  checks that the token is fine-grained, not that it is read-only.
+  alias is removed with a warning when the command loads, and uv caches in `~/.cache/uv`,
+  the folder the strict example opens. `make sandbox-test` checks that GitHub refuses a
+  push on this repository when your token can read it: `claude-sb` only checks that the
+  token is fine-grained, not that it is read-only.
   See `sandbox/README.md`.
 
 ## [v0.2.0] — 2026-10-04

@@ -502,11 +502,12 @@ warns. Pull requests, issues and comments go through the GitHub MCP server.
 
 All configured servers run inside the sandbox with their usual tokens; in
 strict, each also needs its host and its tool's exceptions. The wrapper sets
-two variables so they start:
+three variables so they and uv start:
 
 | Variable | Why |
 | --- | --- |
 | `UV_TOOL_DIR=~/.cache/claude-sb/uv-tools` | `uvx` takes a lock in its tool folder. The usual one, `~/.local/share/uv/tools`, stays closed so `uv tool install` cannot install globally. |
+| `UV_CACHE_DIR=~/.cache/uv` | The folder the strict example opens. Older uv versions default to `~/Library/Caches/uv` on macOS, which strict keeps closed. Current versions already use `~/.cache/uv`. |
 | `FASTMCP_ENV_FILE=/dev/null` | fastmcp-based servers read `.env` from the project folder and crash when the sandbox denies it. |
 
 Servers that log in through the browser (OAuth, for example Miro) work: the

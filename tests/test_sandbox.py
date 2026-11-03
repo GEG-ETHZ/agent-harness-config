@@ -343,6 +343,19 @@ def test_an_old_alias_gives_way_with_a_warning():
     assert "removed the alias claude-sb" in result.stderr
 
 
+def session_env() -> dict[str, str]:
+    lines = wrapper("print -rl -- $_CLAUDE_SB_ENV").stdout.splitlines()
+    return dict(line.split("=", 1) for line in lines)
+
+
+def test_uv_caches_where_the_strict_example_opens():
+    # Older uv versions default to ~/Library/Caches/uv on macOS.
+    example = json.loads((SANDBOX / "examples" / "policy.local.strict.json").read_text())
+
+    assert session_env()["UV_CACHE_DIR"] == f"{os.environ['HOME']}/.cache/uv"
+    assert "~/.cache/uv" in example["filesystem"]["allowWrite"]
+
+
 def session_settings() -> dict:
     return json.loads(wrapper("print -r -- $_CLAUDE_SB_SETTINGS").stdout)
 

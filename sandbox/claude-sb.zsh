@@ -42,10 +42,12 @@ _CLAUDE_SB_TOKEN_SERVICE="claude-sb-oauth"
 # Jira). Their tool calls show in the session and go through auto mode's
 # checks, so a watching person sees what the agent does with them.
 #
-# Two variables keep MCP servers working inside the sandbox:
+# Three variables keep uv and MCP servers working inside the sandbox:
 # - uvx takes a lock in its tool folder (~/.local/share/uv/tools), which is
 #   closed so that `uv tool install` cannot install globally; uvx gets its
 #   own tool folder in the cache instead.
+# - uv caches in ~/.cache/uv, the folder the strict example opens. Older uv
+#   versions default to ~/Library/Caches/uv on macOS, which strict keeps closed.
 # - fastmcp-based servers read .env from the project folder and crash when
 #   the sandbox denies it, instead of skipping it.
 #
@@ -59,6 +61,7 @@ _CLAUDE_SB_TOKEN_SERVICE="claude-sb-oauth"
 # If the token ever gets Contents: write, push works too; tests/run.sh checks.
 _CLAUDE_SB_GIT_HELPER='!f() { echo username=x-access-token; echo "password=$GITHUB_PERSONAL_ACCESS_TOKEN"; }; f'
 _CLAUDE_SB_ENV=(UV_TOOL_DIR="$HOME/.cache/claude-sb/uv-tools"
+  UV_CACHE_DIR="$HOME/.cache/uv"
   FASTMCP_ENV_FILE=/dev/null
   GIT_CONFIG_COUNT=4
   GIT_CONFIG_KEY_0=credential.https://github.com.helper GIT_CONFIG_VALUE_0=
