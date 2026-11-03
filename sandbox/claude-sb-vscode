@@ -1,0 +1,11 @@
+#!/bin/zsh -l
+# claude-sb for the Claude Code VS Code extension. Point the extension's
+# claudeCode.claudeProcessWrapper setting at the installed copy:
+#   ~/.config/claude-sb/claude-sb-vscode
+#
+# A login shell (-l), because VS Code started from the Dock does not carry
+# your terminal's PATH: ~/.zprofile is what puts node and srt on it, and
+# exports the tokens. Everything else is claude-sb's own code.
+
+source "${0:A:h}/claude-sb.zsh" || exit 1
+claude-sb-vscode "$@"

@@ -517,6 +517,47 @@ hand-authored skill in `ai-skills-library` (hence the 80-vs-81 gap in the lockfi
 had to be re-applied after re-vendoring. **Fix it upstream in `ai-skills-library` and drop this
 patch on the next sync.**
 
+## sandbox-runtime (`srt`), under claude-sb
+
+`sandbox/` builds on Anthropic's [sandbox-runtime](https://github.com/anthropics/sandbox-runtime),
+installed from npm as `@anthropic-ai/sandbox-runtime`. It is a second upstream, pinned on its
+own: `SRT_VERSION` in `sandbox/claude-sb-run.mjs` is the only place, `make sandbox-install`
+installs that version, and the launcher refuses any other. `tests/test_sandbox.py` fails if
+the version appears anywhere else.
+
+What the code relies on, as of 0.0.79:
+
+- **The `srt` command always filters the network.** Its settings file requires
+  `network.allowedDomains`, and that list accepts no `*`. The library filters only when the
+  list is given, so `claude-sb-run.mjs` starts the sandbox through the library, after checking
+  the policy with srt's own `SandboxRuntimeConfigSchema`. A personal `policy.local.json` with
+  a `network` block is passed on as it is, and then srt filters: only `allowedDomains`, and no
+  local sockets unless `allowUnixSockets` names them. It imports only the package's entry
+  point (`dist/index.js`); shell quoting is the launcher's own.
+- **Without a network block, every socket is allowed**, local ones included: the macOS profile
+  gets `(allow network*)` (`dist/sandbox/macos-sandbox-utils.js`). The ssh-agent and Docker
+  sockets are therefore reachable; the wrapper removes `SSH_AUTH_SOCK`, `SSH_AGENT_PID` and
+  `DOCKER_HOST` so tools do not find them.
+- **The more specific read rule wins.** A `denyRead` entry inside an `allowRead` region stays
+  closed (`**/.env` under `.`), and an `allowRead` reopens only inside a broader `denyRead`.
+  A personal policy on the strict profile uses it to keep a credential folder closed inside
+  a parent folder it reopens (`~/.config/gh` under `~/.config`). Only two levels work: a
+  literal `denyRead` inside an `allowRead` is re-emitted after every allow
+  (`lateReadDenyFilters` in `dist/sandbox/macos-sandbox-utils.js`), so a third, deeper
+  `allowRead` cannot reopen part of it. A glob `denyRead` is re-emitted minus the allows it
+  covers, which is why strict closes `~/.claude/projects/*` and not `~/.claude/projects`.
+- **Some paths are never writable** in the project, whatever the policy says: `.git/hooks`,
+  `.git/config`, `.vscode`, `.idea`, `.claude/commands`, `.claude/agents`, `.mcp.json` and the
+  shell start-up files. Tools that open every file for writing, such as pre-commit's
+  `end-of-file-fixer` on `--all-files`, fail inside on a tracked `.vscode/` file.
+- **Some paths are always writable**: `/tmp/claude` and, unless closed for reading,
+  `~/.npm/_logs` and `~/.claude/debug`.
+- **Reaching `com.apple.trustd.agent` needs `enableWeakerNetworkIsolation`.** Go programs check
+  TLS certificates through it.
+
+To bump: change `SRT_VERSION`, read the release notes for the points above, run
+`make sandbox-test` and start a session; then `make sandbox-install`.
+
 ## Not adopted
 
 - **`security` module** — mostly domain-specific (`defi-amm-security`, `hipaa-compliance`,

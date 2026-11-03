@@ -69,15 +69,30 @@ BigQuery, Miro boards, and self-hosted Jira and Confluence. A fifth, GitHub, is 
 Miro authenticates in the browser and needs nothing from you first. The others need personal
 values:
 
-- **Tokens go in your shell profile** (`~/.bashrc` or `~/.zshrc`), never in a file here.
-  `make mcp` checks they are set but does not store them; each server reads them from the
-  shell you start Claude Code in. A changed token takes effect on the next Claude Code start.
+- **Tokens go in the macOS Keychain**, never as plain text in a file: not here, and not in
+  your shell profile, which any program you run can read. The profile exports them by
+  reading the Keychain (below). `make mcp` checks they are set but does not store them;
+  each server reads them from the shell you start Claude Code in. A changed token takes
+  effect on the next Claude Code start.
 - **Everything else** (instance URLs, the GCP project) can also go in `.env`, which is
   gitignored:
 
 ```bash
 cp .env.example .env   # then fill in the values for the servers you want
 ```
+
+A token, once per token (`security` asks for the value, so it never lands in your shell
+history), and the line that exports it, in `~/.zprofile`:
+
+```bash
+security add-generic-password -a "$USER" -s confluence-token -w
+
+# ~/.zprofile — only if not set yet, so a value passed in from outside wins
+[[ -z $CONFLUENCE_TOKEN ]] && CONFLUENCE_TOKEN=$(security find-generic-password -a "$USER" -s confluence-token -w 2>/dev/null) && export CONFLUENCE_TOKEN
+```
+
+The same for `JIRA_TOKEN` and `GITHUB_PERSONAL_ACCESS_TOKEN`. On Linux, use your secret
+store the same way (`secret-tool lookup ...`).
 
 `CONFLUENCE_URL` and `CONFLUENCE_TOKEN` are required for the Atlassian server, `JIRA_URL` and
 `JIRA_TOKEN` are optional, and tokens come from each system's own profile settings. The
@@ -117,7 +132,8 @@ To switch per folder, put `export CLOUDSDK_ACTIVE_CONFIG_NAME=proj-a` in an `.en
 [direnv](https://direnv.net/).
 
 **Everything else** is an environment variable. Set it in your shell (`~/.bashrc` or
-`~/.zshrc`); the values that are not secrets can also go in `.env` here for `make mcp`:
+`~/.zshrc`), tokens read from the Keychain as above; the values that are not secrets can
+also go in `.env` here for `make mcp`:
 
 | Variable | Used by | What it is |
 | --- | --- | --- |
@@ -225,6 +241,8 @@ agent-harness-config/
 │   ├── check-profile.py             ← the custom profile still resolves after materialize
 │   ├── context-cost.py              ← what the config costs in context per session
 │   └── doctor.py                    ← is what you have installed still current?
+├── sandbox/                         ← claude-sb: Claude Code inside an OS sandbox
+│                                      (optional, make sandbox-install; sandbox/README.md)
 ├── Makefile                         ← install / update / doctor / context / check / mcp
 ├── UPSTREAM.md                      ← the pin, every delta, and known issues
 ├── CHANGELOG.md                     ← what changed between tags
@@ -243,6 +261,23 @@ make install
 
 That is once per person, per machine. Run `make plan` first if you want to see what it will
 write before it writes anything, and `make uninstall` to remove everything it wrote.
+
+### Optional: claude-sb, Claude Code in a sandbox (macOS)
+
+`claude-sb` runs Claude Code inside an operating-system sandbox, so a supervised session can
+run in `auto` mode without changing anything outside the project or reading your
+credentials. It is not part of `make install`:
+
+```bash
+make sandbox-install   # the pinned sandbox-runtime, ~/.config/claude-sb/, a line in ~/.zshrc
+make sandbox-test      # probe the policy
+make sandbox-policy    # the policy it runs with, your own additions merged in
+```
+
+It works in the terminal and in the VS Code extension. A strict profile closes everything
+and opens only the exceptions you list in `~/.config/claude-sb/policy.local.json`. What it blocks, what it does not, and the
+login token it needs: `sandbox/README.md`.
+`make doctor` reports an installed copy that is older than `sandbox/`.
 
 ### Cursor and Antigravity are project-scoped
 
