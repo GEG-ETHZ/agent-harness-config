@@ -55,7 +55,10 @@
     ],
     "denyWrite": [
       "~/.claude/settings.json",
-      "~/.claude/scripts"
+      "~/.claude/scripts",
+      "/**/.env",
+      "/**/.env.local",
+      "/**/.env.*.local"
     ]
   },
   "network": {

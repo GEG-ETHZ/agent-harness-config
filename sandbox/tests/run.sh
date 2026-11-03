@@ -361,8 +361,15 @@ expect_block "write .git/hooks"             'touch .git/hooks/pre-commit'
 expect_block "write .git/config"            ': >> .git/config'
 expect_block "write .vscode (tasks.json)"   'mkdir -p .vscode'
 
+echo "-- secrets in the project cannot be overwritten"
+expect_block "overwrite .env"               ': >> .env'
+expect_block "overwrite .env.local"         ': >> .env.local'
+expect_block "create .env.development.local" 'touch .env.development.local' \
+  'rm -f .env.development.local'
+
 echo "-- normal work"
 expect_work core "write a file in the project" 'echo x > notes.txt'
+expect_work core "write .env.example"          'echo SECRET= > .env.example'
 expect_work core "git add + commit"            'git add main.py && git -c user.name=probe -c user.email=probe@example.invalid commit -qm probe'
 expect_work core "run python"                  'python3 main.py'
 expect_work core "write AGENTS.md / CLAUDE.md" 'echo x > AGENTS.md && echo x > CLAUDE.md'
