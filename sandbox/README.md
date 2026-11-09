@@ -383,6 +383,9 @@ starts with; aliases and functions are missing inside.
 - not `~/.claude/.credentials.json`, `~/.claude/statsig` or
   `~/.claude/telemetry`.
 
+**Closed for writing** (`denyWrite`): the same entries as supervised, the
+`.env` files included.
+
 No download caches.
 
 **Network:** `api.anthropic.com`, `statsig.anthropic.com`, `claude.ai` and
@@ -412,6 +415,7 @@ could use to act on other systems.
 | `~/.git-credentials`, `~/.config/git/credentials` | Passwords stored by git's `store` helper | Push to any git host. |
 | `~/.npmrc`, `~/.pypirc`, `~/.cargo/credentials`, `~/.cargo/credentials.toml`, `~/.m2/settings.xml`, `~/.gradle/gradle.properties` | Package registry logins | Publish packages as you. Only the credential files: the rest of `~/.cargo`, `~/.m2` and `~/.gradle` holds caches the tools need. |
 | `~/.terraform.d/credentials.tfrc.json`, `~/.azure`, `~/.config/op`, `~/.config/glab-cli`, `~/.databrickscfg`, `~/.cache/huggingface/token` | Terraform Cloud, Azure, 1Password CLI, GitLab CLI, Databricks and Hugging Face logins | Act on those services as you. |
+| `~/.pgpass`, `~/.my.cnf`, `~/.mongodb` | Postgres and MySQL passwords, the mongosh config and history (connection strings with passwords) | Query or change databases as you, without a prompt. |
 | `~/.docker`, `~/.colima`, `~/.orbstack`, `~/.rd`, `~/.local/share/containers`, `~/.kube` | Container registry logins, the folders of Docker alternatives (Colima, OrbStack, Rancher Desktop, Podman), Kubernetes logins | Push images, act on clusters. Whether closing a folder also stops a connection to a socket inside it is not tested; the removed `DOCKER_HOST` is the main guard. |
 | `~/Library/Application Support/Slack`, `~/Library/Application Support/Microsoft/Teams`, `~/Library/Containers/com.microsoft.teams2` | Chat app data | Session cookies: read and post messages as you. |
 | `/**/.env`, `/**/.env.*` | Project secrets, in any project | API keys and passwords next to the code, `.env.local` and `.env.production` included. |
@@ -442,9 +446,10 @@ first thing a manipulated agent would send out.
 | `~/.cache`, `~/.npm`, `~/Library/Caches` | Download and build caches of uv, pip, npm and others. Tools outside the sandbox use them too (see Limitations), but every tool keeps its own and no narrower rule fits them all. |
 | `~/.claude/settings.json` (`denyWrite`) | The permission rules for every session. An agent changing its own rules is overreach, however well meant. |
 | `~/.claude/scripts` (`denyWrite`) | Hook code. An agent stopped by a hook could otherwise edit the hook instead. |
+| `/**/.env`, `/**/.env.local`, `/**/.env.*.local` (`denyWrite`) | Project secrets the agent cannot read, so it cannot see what an overwrite would destroy. Only the names that hold secrets by convention: srt cannot reopen a path for writing once `denyWrite` closes it, so `/**/.env.*` would also close `.env.example`, which the agent keeps up to date. `.env.production` and the like stay writable. |
 
-The two `denyWrite` entries are outside `allowWrite` already; they stay listed
-as a guard in case it is widened again. strict lists them too.
+The first two `denyWrite` entries are outside `allowWrite` already; they stay
+listed as a guard in case it is widened again. strict lists all of them too.
 
 #### Other settings
 

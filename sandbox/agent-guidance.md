@@ -18,8 +18,8 @@ What it blocks:
   and the download caches. Other projects are readable, not writable. Global installs
   (`brew`, `npm -g`, `pip --user`, `uv tool install`) fail.
 - Writes to `~/.claude/settings.json`, hooks, rules, skills, agents, commands,
-  plugins and `CLAUDE.md` in `~/.claude`, and to `.git/hooks`, `.git/config` and
-  `.vscode` in the project.
+  plugins and `CLAUDE.md` in `~/.claude`, and to `.git/hooks`, `.git/config`,
+  `.vscode`, `.env`, `.env.local` and `.env.*.local` in the project.
 - Reading credentials: `~/.ssh`, `~/.aws`, `~/.config/gcloud`, `~/.config/gh`,
   `~/.gnupg`, `~/.netrc`, the Keychain, `.env` files, shell histories, and the
   logins of git, package registries, containers and other tools. `gh` does not
