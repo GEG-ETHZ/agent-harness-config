@@ -1,15 +1,18 @@
 // Run a command under sandbox-runtime with claude-sb's policy.
 //
-// Usage: node claude-sb-run.mjs SRT_DIST POLICY [--local LOCAL] -c 'command string'
-//        node claude-sb-run.mjs SRT_DIST POLICY [--local LOCAL] -- command [args...]
-//        node claude-sb-run.mjs --print POLICY [--local LOCAL]
+// Usage: node claude-sb-run.mjs SRT_DIST POLICY [OPTIONS] -c 'command string'
+//        node claude-sb-run.mjs SRT_DIST POLICY [OPTIONS] -- command [args...]
+//        node claude-sb-run.mjs --print POLICY [OPTIONS]
+// OPTIONS: --local LOCAL, and --add-dir DIR as often as needed.
 //
 // POLICY is the shared, supervised policy; policy.strict.json next to it is
 // the strict one. LOCAL, if given, is your personal file: its "extends" picks
 // the profile ("supervised", the default, or "strict"), and everything else in
 // it is merged over that profile (see mergePolicy). {project} in a path
-// stands for the current project's folder in ~/.claude/projects. --print
-// shows the result and needs no srt.
+// stands for the current project's folder in ~/.claude/projects. Each
+// --add-dir DIR (an absolute path) is writable for this run only, with the
+// protection srt gives the project (see withAddedDirs). --print shows the
+// result and needs no srt.
 //
 // The srt CLI always filters the network: its settings file requires
 // network.allowedDomains, and that list accepts no bare "*". The library only
@@ -29,35 +32,53 @@ import { pathToFileURL } from 'node:url';
 // sandbox and handles a policy without a network block.
 const SRT_VERSION = '0.0.79';
 const USAGE = [
-  "usage: claude-sb-run.mjs SRT_DIST POLICY [--local LOCAL] (-c 'command' | -- command [args...])",
-  '       claude-sb-run.mjs --print POLICY [--local LOCAL]',
+  "usage: claude-sb-run.mjs SRT_DIST POLICY [--local LOCAL] [--add-dir DIR]... (-c 'command' | -- command [args...])",
+  '       claude-sb-run.mjs --print POLICY [--local LOCAL] [--add-dir DIR]...',
 ].join('\n');
+
+// What srt keeps unwritable in the project, so that nothing written there runs
+// later outside the sandbox: its DANGEROUS_FILES and dangerous directories, plus
+// .git/hooks and .git/config (macGetMandatoryDenyEntries in srt 0.0.79). srt
+// does not export them and anchors them at the folder it starts in, so an added
+// folder gets the same list from here. Check it when SRT_VERSION changes.
+export const PROTECTED_NAMES = [
+  '.gitconfig', '.gitmodules', '.bashrc', '.bash_profile', '.zshrc', '.zprofile', '.profile',
+  '.ripgreprc', '.mcp.json', '.vscode', '.idea', '.claude/commands', '.claude/agents',
+  '.git/hooks', '.git/config',
+];
 
 function fail(message) {
   console.error(`claude-sb-run: ${message}`);
   process.exit(2);
 }
 
-function takeLocal(rest) {
-  if (rest[0] !== '--local') return { localPath: undefined, rest };
-  if (!rest[1]) fail(USAGE);
-  return { localPath: rest[1], rest: rest.slice(2) };
+function takeOptions(argv) {
+  let localPath;
+  const addDirs = [];
+  let rest = argv;
+  while (rest[0] === '--local' || rest[0] === '--add-dir') {
+    if (!rest[1]) fail(USAGE);
+    if (rest[0] === '--local') localPath = rest[1];
+    else addDirs.push(rest[1]);
+    rest = rest.slice(2);
+  }
+  return { localPath, addDirs, rest };
 }
 
 function parseArgs(argv) {
   if (argv[0] === '--print') {
     const [, policyPath, ...more] = argv;
     if (!policyPath) fail(USAGE);
-    const { localPath, rest } = takeLocal(more);
+    const { rest, ...options } = takeOptions(more);
     if (rest.length > 0) fail(USAGE);
-    return { print: true, policyPath, localPath };
+    return { print: true, policyPath, ...options };
   }
   const [srtDist, policyPath, ...more] = argv;
   if (!srtDist || !policyPath) fail(USAGE);
-  const { localPath, rest } = takeLocal(more);
+  const { rest, ...options } = takeOptions(more);
   const [mode, ...command] = rest;
-  if (mode === '-c' && command.length === 1) return { srtDist, policyPath, localPath, commandString: command[0] };
-  if (mode === '--' && command.length > 0) return { srtDist, policyPath, localPath, commandArgs: command };
+  if (mode === '-c' && command.length === 1) return { srtDist, policyPath, ...options, commandString: command[0] };
+  if (mode === '--' && command.length > 0) return { srtDist, policyPath, ...options, commandArgs: command };
   return fail(USAGE);
 }
 
@@ -129,14 +150,36 @@ function withProject(value, key) {
 // personal file adds the exceptions.
 const PROFILES = { supervised: (policyPath) => policyPath, strict: (policyPath) => join(dirname(policyPath), 'policy.strict.json') };
 
-function effectivePolicy(policyPath, localPath) {
+// Each added folder is treated like the project: writable, opened for reading
+// where the profile opens the project ("." in allowRead, strict), so that its
+// .env files stay closed in supervised, and its PROTECTED_NAMES closed for
+// writing at any depth: srt's deny patterns cover what they match and
+// everything beneath it, and "**/" also matches the folder itself. The folder
+// is spliced into the patterns as it is, so one with glob characters would
+// match something else and is refused.
+export function withAddedDirs(policy, dirs) {
+  for (const dir of dirs) {
+    if (!dir.startsWith('/')) fail(`--add-dir ${dir}: not an absolute path`);
+    if (/[*?[\]{}]/.test(dir)) fail(`--add-dir ${dir}: a folder with * ? [ ] { } in its path cannot be protected`);
+  }
+  const readsProject = policy.filesystem?.allowRead?.includes('.') ?? false;
+  return mergePolicy(policy, {
+    filesystem: {
+      allowRead: readsProject ? dirs : [],
+      allowWrite: dirs,
+      denyWrite: dirs.flatMap((dir) => PROTECTED_NAMES.map((name) => `${dir}/**/${name}`)),
+    },
+  });
+}
+
+function effectivePolicy(policyPath, localPath, addDirs = []) {
   const personal = localPath && existsSync(localPath) ? readJson(localPath, 'personal policy') : {};
   const { extends: profile = 'supervised', ...additions } = personal;
   if (!(profile in PROFILES)) {
     fail(`"extends": "${profile}" in ${localPath}: use one of ${Object.keys(PROFILES).join(', ')}`);
   }
   const merged = mergePolicy(readJson(PROFILES[profile](policyPath), `${profile} policy`), additions);
-  return withProject(merged, projectKey(process.cwd()));
+  return withAddedDirs(withProject(merged, projectKey(process.cwd())), addDirs);
 }
 
 function validate(policy, SandboxRuntimeConfigSchema) {
@@ -154,7 +197,7 @@ function validate(policy, SandboxRuntimeConfigSchema) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const policy = effectivePolicy(args.policyPath, args.localPath);
+  const policy = effectivePolicy(args.policyPath, args.localPath, args.addDirs);
   if (args.print) {
     console.log(JSON.stringify(policy, null, 2));
     return;
@@ -191,7 +234,8 @@ async function main() {
   child.on('error', (error) => fail(`cannot start the command: ${error.message}`));
 }
 
-// Run only as a program; importing the module (for mergePolicy) starts nothing.
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Run only as a program; importing the module (for mergePolicy) starts nothing,
+// from `node -e` too, where there is no script path.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => fail(error instanceof Error ? error.message : String(error)));
 }

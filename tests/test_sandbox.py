@@ -413,3 +413,169 @@ def test_supervised_keeps_plugins_closed():
     # Plugins bring hooks that run later in plain claude, outside the sandbox.
     for name in ("policy.json", "policy.strict.json"):
         assert not any("plugins" in entry for entry in policy(name)["filesystem"]["allowWrite"])
+
+
+def policy_with_added_dirs(
+    dirs: list[str], local: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    if shutil.which("node") is None:
+        pytest.skip("node not installed")
+    args = ["node", str(SANDBOX / "claude-sb-run.mjs"), "--print", str(SANDBOX / "policy.json")]
+    if local is not None:
+        args += ["--local", str(local)]
+    for directory in dirs:
+        args += ["--add-dir", directory]
+    return subprocess.run(args, capture_output=True, text=True)
+
+
+def test_added_folder_is_writable_with_the_projects_protection():
+    # Arrange
+    added = "/Users/someone/projects/backend"
+
+    # Act
+    filesystem = json.loads(policy_with_added_dirs([added]).stdout)["filesystem"]
+
+    # Assert
+    assert added in filesystem["allowWrite"]
+    for name in (".git/hooks", ".git/config", ".vscode", ".mcp.json", ".claude/commands"):
+        assert f"{added}/**/{name}" in filesystem["denyWrite"]
+    base = policy()["filesystem"]["denyWrite"]
+    assert filesystem["denyWrite"][: len(base)] == base
+
+
+def test_added_folder_is_opened_for_reading_only_where_the_project_is(tmp_path):
+    # Supervised reads are open already; an allowRead entry there could reopen
+    # the folder's .env files. Strict closes ~ and opens the project, so the
+    # added folder is opened too, its .env files closed again by strict.
+    added = "/Users/someone/projects/backend"
+    strict = tmp_path / "policy.local.json"
+    strict.write_text(json.dumps({"extends": "strict"}))
+
+    supervised_read = json.loads(policy_with_added_dirs([added]).stdout)["filesystem"]["allowRead"]
+    strict_read = json.loads(policy_with_added_dirs([added], strict).stdout)["filesystem"][
+        "allowRead"
+    ]
+
+    assert added not in supervised_read
+    assert added in strict_read
+
+
+@pytest.mark.parametrize("directory", ["projects/backend", "/Users/x/proj[1]", "/Users/x/*"])
+def test_runner_refuses_an_added_folder_it_cannot_protect(directory):
+    result = policy_with_added_dirs([directory])
+
+    assert result.returncode == 2
+    assert "--add-dir" in result.stderr
+
+
+def test_protected_names_match_what_srt_protects_in_the_project():
+    # srt anchors its own list at the start folder; the launcher repeats it
+    # for added folders, and must follow it when SRT_VERSION changes.
+    srt = shutil.which("srt")
+    if srt is None or shutil.which("node") is None:
+        pytest.skip("srt not installed")
+    utils = Path(srt).resolve().parent / "sandbox" / "sandbox-utils.js"
+    script = (
+        f"const srt = await import({json.dumps(utils.as_uri())});"
+        f"const ours = await import({json.dumps((SANDBOX / 'claude-sb-run.mjs').as_uri())});"
+        "console.log(JSON.stringify({srt: [...srt.DANGEROUS_FILES, ...srt.getDangerousDirectories(),"
+        " '.git/hooks', '.git/config'], ours: ours.PROTECTED_NAMES}));"
+    )
+
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script], capture_output=True, text=True, check=True
+    )
+
+    names = json.loads(result.stdout)
+    assert sorted(names["ours"]) == sorted(names["srt"])
+
+
+def added_dirs(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    script = (
+        'local -a add_dirs claude_args; _claude_sb_add_dirs "$@" || exit 1; '
+        'print -rl -- "${(j:|:)add_dirs}" "${(j:|:)claude_args}"'
+    )
+    if shutil.which("zsh") is None:
+        pytest.skip("zsh not installed")
+    return subprocess.run(
+        [
+            "zsh",
+            "-c",
+            f'source {SANDBOX / "claude-sb.zsh"} && f() {{ {script} }} && f "$@"',
+            "zsh",
+            *args,
+        ],
+        capture_output=True,
+        text=True,
+        cwd=project,
+        env={"PATH": os.environ["PATH"], "HOME": os.environ["HOME"]},
+    )
+
+
+@pytest.fixture
+def two_projects(tmp_path):
+    # Under /private/tmp, one of the roots outside ~ that may hold a project.
+    root = Path("/private/tmp") / f"claude-sb-test-{os.getpid()}"
+    for name in ("frontend", "backend", "infra"):
+        (root / "work" / name).mkdir(parents=True, exist_ok=True)
+    yield root / "work"
+    shutil.rmtree(root)
+
+
+def test_add_dir_resolves_folders_in_both_forms_and_keeps_other_args(two_projects):
+    # Arrange
+    backend, infra = two_projects / "backend", two_projects / "infra"
+
+    # Act
+    result = added_dirs(
+        two_projects / "frontend",
+        "--add-dir",
+        "../backend",
+        "../infra",
+        "--model",
+        "x",
+        "--add-dir=../backend",
+        "-p",
+        "hi",
+    )
+
+    # Assert
+    assert result.returncode == 0, result.stderr
+    dirs, args = result.stdout.splitlines()
+    assert dirs.split("|") == [str(backend), str(infra), str(backend)]
+    assert args.split("|") == [
+        "--add-dir",
+        str(backend),
+        str(infra),
+        "--model",
+        "x",
+        f"--add-dir={backend}",
+        "-p",
+        "hi",
+    ]
+
+
+def test_add_dir_leaves_everything_after_double_dash_alone(two_projects):
+    result = added_dirs(two_projects / "frontend", "--", "--add-dir", "../backend")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == ["", "--|--add-dir|../backend"]
+
+
+@pytest.mark.parametrize(
+    ("directory", "message"),
+    [("~", "not starting in ~"), ("../missing", "no such folder"), ("/opt", "system folder")],
+)
+def test_add_dir_refuses_what_the_start_folder_check_refuses(two_projects, directory, message):
+    target = os.path.expanduser(directory) if directory == "~" else directory
+
+    result = added_dirs(two_projects / "frontend", "--add-dir", target)
+
+    assert result.returncode == 1
+    assert message in result.stderr
+
+
+def test_launcher_hands_the_added_folders_to_the_sandbox():
+    launcher = (SANDBOX / "claude-sb.zsh").read_text()
+
+    assert "$local_args $runner_dirs --" in launcher

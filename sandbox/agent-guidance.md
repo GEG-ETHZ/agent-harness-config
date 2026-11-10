@@ -58,8 +58,9 @@ blocked, not just the path or command you tried.
        You can: <exact command for a separate terminal> or <start claude-sb in the right folder>.
 
    Commands started with `!` in this session run inside the sandbox too.
-3. **Work in another repository only from a session started there**
-   (`cd ~/projects/<repo> && claude-sb`). If a task belongs in another
+3. **Work in another repository only from a session that includes it**:
+   started there (`cd ~/projects/<repo> && claude-sb`), or started with
+   `claude-sb --add-dir ../<repo>`. If a task belongs in another
    repository, say so before starting it, not after a write fails.
 4. **Report a policy problem.** If the block stops ordinary work the sandbox
    should allow (a normal tool's cache, a common workflow, not a one-off),

@@ -152,6 +152,44 @@ _claude_sb_check_folder() {
   return 0
 }
 
+# _claude_sb_add_dirs ARGS...: for claude's --add-dir, in both its forms
+# (--add-dir DIR [DIR...], --add-dir=DIR). Fills the caller's add_dirs with
+# each folder, resolved like the start folder and checked the same way, and
+# claude_args with ARGS, those folders replaced by their resolved paths, so
+# Claude Code and the sandbox open the same folders.
+_claude_sb_add_dirs() {
+  local arg raw dir in_list=0 options_done=0
+  for arg in "$@"; do
+    raw=""
+    if (( options_done )); then
+      claude_args+=("$arg")
+      continue
+    elif [[ $arg == -- ]]; then
+      options_done=1 in_list=0
+    elif [[ $arg == --add-dir ]]; then
+      in_list=1
+    elif [[ $arg == --add-dir=* ]]; then
+      raw=${arg#--add-dir=} in_list=0
+    elif (( in_list )) && [[ $arg != -* ]]; then
+      raw=$arg
+    else
+      in_list=0
+    fi
+    if [[ -z $raw ]]; then
+      claude_args+=("$arg")
+      continue
+    fi
+    if [[ ! -d $raw ]]; then
+      print -u2 "claude-sb: --add-dir $raw: no such folder."
+      return 1
+    fi
+    dir=${raw:A}
+    _claude_sb_check_folder "$dir" || { print -u2 "  (named by --add-dir $raw)"; return 1; }
+    add_dirs+=("$dir")
+    if [[ $arg == --add-dir=* ]]; then claude_args+=("--add-dir=$dir"); else claude_args+=("$dir"); fi
+  done
+}
+
 _claude_sb_token() {
   security find-generic-password -s "$_CLAUDE_SB_TOKEN_SERVICE" -a "$USER" -w 2>/dev/null && return 0
   print -u2 "claude-sb: no login token yet. Set it up once:"
@@ -197,6 +235,15 @@ _claude_sb_launch() {
   # srt itself resolves "." to the real path.
   local project=${PWD:A}
   _claude_sb_check_folder "$project" || return 1
+  # --add-dir widens a session, not a subcommand, to more folders, each
+  # writable for this session only (README.md, "Work across repositories").
+  local -a add_dirs claude_args runner_dirs
+  if [[ $# -eq 0 || $1 == -* ]]; then
+    _claude_sb_add_dirs "$@" || return 1
+    set -- "${claude_args[@]}"
+  fi
+  local dir
+  for dir in $add_dirs; do runner_dirs+=(--add-dir "$dir"); done
   local token
   token=$(_claude_sb_token) || return 1
 
@@ -211,7 +258,8 @@ _claude_sb_launch() {
   node "$_CLAUDE_SB_RUNNER" --print "$_CLAUDE_SB_POLICY" $local_args 2>/dev/null | grep -q '"network"' \
     && network=filtered
 
-  local sb_status="sandboxed ($profile): writes -> ${project/#${HOME:A}/~}, network -> $network"
+  local -a writable=("$project" $add_dirs)
+  local sb_status="sandboxed ($profile): writes -> ${(j:, :)${(@)writable/#${HOME:A}/~}}, network -> $network"
   print -u2 "$sb_status"
   # As a JSON string: backslashes and quotes in the project path escaped.
   local sb_json=${${sb_status//\\/\\\\}//\"/\\\"}
@@ -232,7 +280,7 @@ _claude_sb_launch() {
     CLAUDE_CODE_OAUTH_TOKEN="$token" DISABLE_AUTOUPDATER=1 \
     CLAUDE_SB_SESSION_MESSAGE="{\"systemMessage\":\"claude-sb: $sb_json\"}" \
     CLAUDE_SB_GUIDANCE="$_CLAUDE_SB_GUIDANCE" \
-    node "$_CLAUDE_SB_RUNNER" "$srt_dist" "$_CLAUDE_SB_POLICY" $local_args -- \
+    node "$_CLAUDE_SB_RUNNER" "$srt_dist" "$_CLAUDE_SB_POLICY" $local_args $runner_dirs -- \
     $claude_cmd $session_args "$@"
 }
 

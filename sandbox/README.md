@@ -17,8 +17,8 @@ Unlike a dev container, there is no per-project setup. `claude-sb` builds the
 sandbox around the folder it starts in, so one install covers every project,
 and the project keeps its real path: no mount points, no second environment
 to keep up to date, nothing to rebuild when the agent needs another folder.
-The folder is fixed for the session; for another project, start `claude-sb`
-there. A container isolates more strictly, since the agent sees only what is
+The folders are fixed for the session: the one it starts in, plus any named
+with `--add-dir`; for another project, start `claude-sb` there. A container isolates more strictly, since the agent sees only what is
 mounted; the strict profile comes closest to that.
 
 This README has two parts. **Part 1** is what you need to set it up and use
@@ -170,6 +170,26 @@ What the sandbox blocks, such as a push, a global install or a change to your
 Claude Code settings, you do yourself in a normal terminal, after checking it,
 rather than handing it to an agent without the sandbox. Commands started with
 `!` inside `claude-sb` run inside the sandbox too.
+
+### Work across repositories
+
+When a task spans several repositories, name the others when you start:
+
+```bash
+cd ~/projects/frontend
+claude-sb --add-dir ../backend --add-dir ../infra
+```
+
+Each named folder is writable for this session only, and Claude Code works in
+it as in the project. It gets the same protection as the project (`.git/hooks`,
+`.git/config`, `.vscode`, ... stay unwritable, `.env` files unreadable) and the
+same check as a start folder, so `--add-dir ~/projects` is refused. The status
+line after starting lists every writable folder. Both forms Claude Code accepts
+work: `--add-dir a b` and `--add-dir=a`.
+
+Memory and transcripts stay with the folder you started in. For repositories
+that always belong together, a parent folder that holds just them
+(`~/projects/acme/{frontend,backend}`) works as a start folder too.
 
 ### Use in VS Code
 
@@ -469,7 +489,10 @@ Not in either policy, and they cannot be switched off there:
 - Never writable in the project: `.git/hooks`, `.git/config`, `.vscode`,
   `.idea`, `.claude/commands`, `.claude/agents`, `.mcp.json`, `.gitconfig`,
   `.gitmodules`, `.bashrc`, `.zshrc`, `.zprofile`, `.profile`, `.ripgreprc`.
-  These run code later, outside the sandbox.
+  These run code later, outside the sandbox. srt applies them to the start
+  folder only; for each `--add-dir` folder, the launcher adds the same list to
+  `denyWrite` itself (`PROTECTED_NAMES` in `claude-sb-run.mjs`, compared with
+  srt's own list in `make test`).
 
 ### Start folders
 
