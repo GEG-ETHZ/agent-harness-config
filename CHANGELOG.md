@@ -11,6 +11,11 @@ library with an API.
 
 Run `make setup-user` again after `make update`.
 
+- claude-sb takes `--add-dir` like Claude Code: `claude-sb --add-dir ../backend` makes
+  that repository writable for the session, with the same protection as the project
+  (`.git/hooks`, `.git/config`, `.vscode` stay unwritable). Run `make sandbox-install`
+  to get it.
+
 - claude-sb: supervised also closes the Postgres, MySQL and mongosh credential files
   (`~/.pgpass`, `~/.my.cnf`, `~/.mongodb`), and both profiles stop the agent from
   overwriting `.env`, `.env.local` and `.env.*.local`, which it cannot read.
