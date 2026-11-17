@@ -169,7 +169,9 @@ _claude_sb_add_dirs() {
     elif [[ $arg == --add-dir ]]; then
       in_list=1
     elif [[ $arg == --add-dir=* ]]; then
+      # zsh expands ~ only at the start of a word, not after =.
       raw=${arg#--add-dir=} in_list=0
+      [[ $raw == '~' || $raw == '~/'* ]] && raw=$HOME${raw#\~}
     elif (( in_list )) && [[ $arg != -* ]]; then
       raw=$arg
     else

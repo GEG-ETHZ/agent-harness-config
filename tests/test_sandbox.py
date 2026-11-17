@@ -492,7 +492,9 @@ def test_protected_names_match_what_srt_protects_in_the_project():
     assert sorted(names["ours"]) == sorted(names["srt"])
 
 
-def added_dirs(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def added_dirs(
+    project: Path, *args: str, home: Path | None = None
+) -> subprocess.CompletedProcess[str]:
     script = (
         'local -a add_dirs claude_args; _claude_sb_add_dirs "$@" || exit 1; '
         'print -rl -- "${(j:|:)add_dirs}" "${(j:|:)claude_args}"'
@@ -510,7 +512,7 @@ def added_dirs(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         cwd=project,
-        env={"PATH": os.environ["PATH"], "HOME": os.environ["HOME"]},
+        env={"PATH": os.environ["PATH"], "HOME": str(home or os.environ["HOME"])},
     )
 
 
@@ -555,6 +557,23 @@ def test_add_dir_resolves_folders_in_both_forms_and_keeps_other_args(two_project
         "-p",
         "hi",
     ]
+
+
+def test_add_dir_expands_a_tilde_after_equals(two_projects):
+    # Arrange: zsh leaves ~ after = unexpanded, so the launcher does it.
+    home = two_projects.parent
+    backend = two_projects / "backend"
+
+    # Act
+    result = added_dirs(
+        two_projects / "frontend",
+        f"--add-dir=~/{backend.relative_to(home)}",
+        home=home,
+    )
+
+    # Assert
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[0] == str(backend)
 
 
 def test_add_dir_leaves_everything_after_double_dash_alone(two_projects):
