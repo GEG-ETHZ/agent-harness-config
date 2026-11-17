@@ -439,6 +439,8 @@ def test_added_folder_is_writable_with_the_projects_protection():
     assert added in filesystem["allowWrite"]
     for name in (".git/hooks", ".git/config", ".vscode", ".mcp.json", ".claude/commands"):
         assert f"{added}/**/{name}" in filesystem["denyWrite"]
+        # The literal path is what stops srt allowing a rename of .git and back.
+        assert f"{added}/{name}" in filesystem["denyWrite"]
     base = policy()["filesystem"]["denyWrite"]
     assert filesystem["denyWrite"][: len(base)] == base
 

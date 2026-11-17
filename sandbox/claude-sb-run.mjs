@@ -154,9 +154,12 @@ const PROFILES = { supervised: (policyPath) => policyPath, strict: (policyPath) 
 // where the profile opens the project ("." in allowRead, strict), so that its
 // .env files stay closed in supervised, and its PROTECTED_NAMES closed for
 // writing at any depth: srt's deny patterns cover what they match and
-// everything beneath it, and "**/" also matches the folder itself. The folder
-// is spliced into the patterns as it is, so one with glob characters would
-// match something else and is refused.
+// everything beneath it, and "**/" also matches the folder itself. Each name is
+// also denied as a literal path, as srt does for the start folder: only for a
+// literal does srt block renaming its parents, so with the glob alone
+// `mv .git g` and back would let a hook in. The folder is spliced into the
+// patterns as it is, so one with glob characters would match something else
+// and is refused.
 export function withAddedDirs(policy, dirs) {
   for (const dir of dirs) {
     if (!dir.startsWith('/')) fail(`--add-dir ${dir}: not an absolute path`);
@@ -167,7 +170,8 @@ export function withAddedDirs(policy, dirs) {
     filesystem: {
       allowRead: readsProject ? dirs : [],
       allowWrite: dirs,
-      denyWrite: dirs.flatMap((dir) => PROTECTED_NAMES.map((name) => `${dir}/**/${name}`)),
+      denyWrite: dirs.flatMap((dir) =>
+        PROTECTED_NAMES.flatMap((name) => [`${dir}/${name}`, `${dir}/**/${name}`])),
     },
   });
 }
