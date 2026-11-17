@@ -488,7 +488,8 @@ Not in either policy, and they cannot be switched off there:
   terminal's output devices.
 - Never writable in the project: `.git/hooks`, `.git/config`, `.vscode`,
   `.idea`, `.claude/commands`, `.claude/agents`, `.mcp.json`, `.gitconfig`,
-  `.gitmodules`, `.bashrc`, `.zshrc`, `.zprofile`, `.profile`, `.ripgreprc`.
+  `.gitmodules`, `.bashrc`, `.bash_profile`, `.zshrc`, `.zprofile`, `.profile`,
+  `.ripgreprc`.
   These run code later, outside the sandbox. srt applies them to the start
   folder only; for each `--add-dir` folder, the launcher adds the same list to
   `denyWrite` itself (`PROTECTED_NAMES` in `claude-sb-run.mjs`, compared with
