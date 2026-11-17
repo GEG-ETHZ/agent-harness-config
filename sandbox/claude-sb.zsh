@@ -156,7 +156,11 @@ _claude_sb_check_folder() {
 # (--add-dir DIR [DIR...], --add-dir=DIR). Fills the caller's add_dirs with
 # each folder, resolved like the start folder and checked the same way, and
 # claude_args with ARGS, those folders replaced by their resolved paths, so
-# Claude Code and the sandbox open the same folders.
+# Claude Code and the sandbox open the same folders. A folder that fails the
+# check stops the start, unless the caller sets keep_refused_dirs=1: then it
+# is passed to Claude Code as it was, gets nothing from the sandbox (read-only
+# at most, closed in ~/Documents and the like), and is listed in the caller's
+# refused_dirs.
 _claude_sb_add_dirs() {
   local arg raw dir in_list=0 options_done=0
   for arg in "$@"; do
@@ -181,14 +185,20 @@ _claude_sb_add_dirs() {
       claude_args+=("$arg")
       continue
     fi
+    dir=${raw:A}
     if [[ ! -d $raw ]]; then
       print -u2 "claude-sb: --add-dir $raw: no such folder."
-      return 1
+    elif _claude_sb_check_folder "$dir"; then
+      add_dirs+=("$dir")
+      if [[ $arg == --add-dir=* ]]; then claude_args+=("--add-dir=$dir"); else claude_args+=("$dir"); fi
+      continue
+    else
+      print -u2 "  (named by --add-dir $raw)"
     fi
-    dir=${raw:A}
-    _claude_sb_check_folder "$dir" || { print -u2 "  (named by --add-dir $raw)"; return 1; }
-    add_dirs+=("$dir")
-    if [[ $arg == --add-dir=* ]]; then claude_args+=("--add-dir=$dir"); else claude_args+=("$dir"); fi
+    (( ${keep_refused_dirs:-0} )) || return 1
+    print -u2 "  It is not writable in this session; the session starts without it."
+    refused_dirs+=("$dir")
+    claude_args+=("$arg")
   done
 }
 
@@ -239,7 +249,7 @@ _claude_sb_launch() {
   _claude_sb_check_folder "$project" || return 1
   # --add-dir widens a session, not a subcommand, to more folders, each
   # writable for this session only (README.md, "Work across repositories").
-  local -a add_dirs claude_args runner_dirs
+  local -a add_dirs claude_args runner_dirs refused_dirs
   if [[ $# -eq 0 || $1 == -* ]]; then
     _claude_sb_add_dirs "$@" || return 1
     set -- "${claude_args[@]}"
@@ -262,6 +272,7 @@ _claude_sb_launch() {
 
   local -a writable=("$project" $add_dirs)
   local sb_status="sandboxed ($profile): writes -> ${(j:, :)${(@)writable/#${HOME:A}/~}}, network -> $network"
+  (( $#refused_dirs )) && sb_status+=", not writable (refused --add-dir) -> ${(j:, :)${(@)refused_dirs/#${HOME:A}/~}}"
   print -u2 "$sb_status"
   # As a JSON string: backslashes and quotes in the project path escaped.
   local sb_json=${${sb_status//\\/\\\\}//\"/\\\"}
@@ -308,8 +319,13 @@ claude-sb() {
 # The VS Code extension runs claudeCode.claudeProcessWrapper with the path of
 # the CLI it bundles as the first argument, followed by its own arguments,
 # --permission-mode among them, so none is added here (seen with extension
-# 2.1.310; not documented, CLAUDE_SB_DEBUG=1 logs what arrives).
+# 2.1.310; not documented, CLAUDE_SB_DEBUG=1 logs what arrives). It also passes
+# --add-dir for each other folder of a multi-root workspace. Those become
+# writable like the terminal's --add-dir, but one that fails the folder check
+# is left out instead of stopping the start: the workspace named it, not
+# the user, and the panel would show only a bare startup failure.
 claude-sb-vscode() {
+  local keep_refused_dirs=1
   local claude=claude
   if [[ -n ${1:-} && -f $1 && ${1:t} == claude* ]]; then
     claude=${(q)1}

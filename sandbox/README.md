@@ -213,6 +213,16 @@ followed by the message `UserPromptSubmit says: claude-sb: sandboxed
 In strict, `/ide` from `claude-sb` in VS
 Code's terminal needs an exception (Add exceptions); the panel does not.
 
+In a multi-root workspace, the other folders are writable too: the extension
+passes each one as `--add-dir`, so they get the same protection and check as
+in [Work across repositories](#work-across-repositories). A folder the check
+refuses (one in `~/Documents`, or `~/projects` itself) does not stop the chat
+as it would in the terminal; it is left out, so not writable (and in
+`~/Documents` not readable either), and the start line names it under
+`not writable (refused --add-dir)`. The first folder of the workspace is the
+one the chat starts in, and it is checked like a terminal start folder: if it
+is refused, the chat does not start. Move a project folder to the top.
+
 ### When something is blocked
 
 A block shows as `Operation not permitted` for a file, or as a `403` from the

@@ -493,11 +493,12 @@ def test_protected_names_match_what_srt_protects_in_the_project():
 
 
 def added_dirs(
-    project: Path, *args: str, home: Path | None = None
+    project: Path, *args: str, home: Path | None = None, keep_refused: bool = False
 ) -> subprocess.CompletedProcess[str]:
     script = (
-        'local -a add_dirs claude_args; _claude_sb_add_dirs "$@" || exit 1; '
-        'print -rl -- "${(j:|:)add_dirs}" "${(j:|:)claude_args}"'
+        f"local keep_refused_dirs={int(keep_refused)}; "
+        'local -a add_dirs claude_args refused_dirs; _claude_sb_add_dirs "$@" || exit 1; '
+        'print -rl -- "${(j:|:)add_dirs}" "${(j:|:)claude_args}" "${(j:|:)refused_dirs}"'
     )
     if shutil.which("zsh") is None:
         pytest.skip("zsh not installed")
@@ -545,7 +546,7 @@ def test_add_dir_resolves_folders_in_both_forms_and_keeps_other_args(two_project
 
     # Assert
     assert result.returncode == 0, result.stderr
-    dirs, args = result.stdout.splitlines()
+    dirs, args, refused = result.stdout.splitlines()
     assert dirs.split("|") == [str(backend), str(infra), str(backend)]
     assert args.split("|") == [
         "--add-dir",
@@ -557,6 +558,7 @@ def test_add_dir_resolves_folders_in_both_forms_and_keeps_other_args(two_project
         "-p",
         "hi",
     ]
+    assert refused == ""
 
 
 def test_add_dir_expands_a_tilde_after_equals(two_projects):
@@ -580,7 +582,7 @@ def test_add_dir_leaves_everything_after_double_dash_alone(two_projects):
     result = added_dirs(two_projects / "frontend", "--", "--add-dir", "../backend")
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines() == ["", "--|--add-dir|../backend"]
+    assert result.stdout.splitlines() == ["", "--|--add-dir|../backend", ""]
 
 
 @pytest.mark.parametrize(
@@ -594,6 +596,38 @@ def test_add_dir_refuses_what_the_start_folder_check_refuses(two_projects, direc
 
     assert result.returncode == 1
     assert message in result.stderr
+
+
+def test_add_dir_from_vs_code_keeps_a_refused_folder_refused(two_projects):
+    # Arrange: VS Code passes every other workspace folder as --add-dir.
+    backend = two_projects / "backend"
+
+    # Act
+    result = added_dirs(
+        two_projects / "frontend",
+        "--add-dir=/opt",
+        "--add-dir=../backend",
+        keep_refused=True,
+    )
+
+    # Assert
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        str(backend),
+        f"--add-dir=/opt|--add-dir={backend}",
+        "/opt",
+    ]
+    assert "system folder" in result.stderr
+    assert "not writable in this session" in result.stderr
+
+
+def test_only_the_vs_code_wrapper_keeps_refused_folders():
+    launcher = (SANDBOX / "claude-sb.zsh").read_text()
+    vscode = launcher.split("claude-sb-vscode() {", 1)[1].split("\n}\n", 1)[0]
+    terminal = launcher.split("claude-sb() {", 1)[1].split("\n}\n", 1)[0]
+
+    assert "keep_refused_dirs=1" in vscode
+    assert "keep_refused_dirs" not in terminal
 
 
 def test_launcher_hands_the_added_folders_to_the_sandbox():

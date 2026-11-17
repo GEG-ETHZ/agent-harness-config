@@ -13,8 +13,10 @@ Run `make setup-user` again after `make update`.
 
 - claude-sb takes `--add-dir` like Claude Code: `claude-sb --add-dir ../backend` makes
   that repository writable for the session, with the same protection as the project
-  (`.git/hooks`, `.git/config`, `.vscode` stay unwritable). Run `make sandbox-install`
-  to get it.
+  (`.git/hooks`, `.git/config`, `.vscode` stay unwritable). In VS Code, the other
+  folders of a multi-root workspace become writable the same way, since the extension
+  passes them as `--add-dir`; one the folder check refuses is left out. Run
+  `make sandbox-install` to get it.
 
 - claude-sb: supervised also closes the Postgres, MySQL and mongosh credential files
   (`~/.pgpass`, `~/.my.cnf`, `~/.mongodb`), and both profiles stop the agent from
