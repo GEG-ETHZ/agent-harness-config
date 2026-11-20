@@ -14,8 +14,12 @@ SANDBOX_DIR   := $(HOME)/.config/claude-sb
 SRT_VERSION   := $(shell sed -n "s/^const SRT_VERSION = '\(.*\)';/\1/p" sandbox/claude-sb-run.mjs)
 SANDBOX_LINE  := [[ -r ~/.config/claude-sb/claude-sb.zsh ]] && source ~/.config/claude-sb/claude-sb.zsh
 
+# A local Langfuse (langfuse/) is cloned outside this repo, to LANGFUSE_HOME (default
+# ~/opt/langfuse). The versions are pinned once, in upstream.json.
+LANGFUSE := python3 tools/langfuse-local.py
+
 .DEFAULT_GOAL := help
-.PHONY: help setup opencode-payload install install-project reinstall plan doctor context check test conventions setup-user mcp bump uninstall update validate audit clean sandbox-install sandbox-test sandbox-policy
+.PHONY: help setup opencode-payload install install-project reinstall plan doctor context check test conventions setup-user mcp bump uninstall update validate audit clean sandbox-install sandbox-test sandbox-policy langfuse-install langfuse-up langfuse-down langfuse-status langfuse-plugin langfuse-reset
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -31,7 +35,7 @@ setup: ## Set up this repo for contributing (git hooks) — not needed just to i
 	pre-commit install-hooks
 	pre-commit run --all-files || true
 	@echo
-	@echo "Hooks active. They run on every commit to this repo."
+	@echo "Hooks active. They run on every commit and push in this repo."
 
 # opencode needs a compiled plugin payload under .ecc/.opencode/dist before its target
 # will install, and building it needs upstream's own dev dependencies — the TypeScript
@@ -110,8 +114,9 @@ mcp: ## Activate the agreed MCP servers: make mcp [ADD=github] [GCP_PROJECT=x] [
 		$(if $(ADD),--add "$(ADD)",)
 
 # The gate CI runs, runnable locally in one word. Same commands, same order, so a green
-# `make check` means a green PR. The one CI job not here is the gitleaks scan of the full
-# history; the pre-commit gitleaks hook covers the files as they are.
+# `make check` means a green PR. The one check not here is the organisation's gitleaks
+# workflow, which scans the full history; the pre-commit gitleaks hook covers the files as
+# they are.
 check: ## Run every check CI runs (hooks, tests, then the overlay against the pinned upstream)
 	@command -v pre-commit >/dev/null 2>&1 || { \
 		echo "pre-commit not found — run 'make setup' first"; exit 1; }
@@ -163,6 +168,7 @@ update: ## Pull the latest shared config and reinstall
 		cmp -s sandbox/$$f $(SANDBOX_DIR)/$$f || { \
 			echo "claude-sb changed: run make sandbox-install in a normal terminal"; break; }; \
 	done
+	@$(LANGFUSE) drift --notice
 
 
 validate: ## Check the pin, the overlay and custom/ are consistent
@@ -209,3 +215,28 @@ sandbox-test: ## Probe the claude-sb policy in sandbox/ (macOS); git on this rep
 
 sandbox-policy: ## Show the policy claude-sb runs with: sandbox/policy.json plus your policy.local.json
 	@node sandbox/claude-sb-run.mjs --print sandbox/policy.json --local $(SANDBOX_DIR)/policy.local.json
+
+# Not part of `make install` or `make update`: it needs a Docker engine with about 8 GiB,
+# downloads about 6 GB of images and keeps full transcripts of your sessions. Run it in a
+# normal terminal. Safe to run again; it changes only what differs. A changed override
+# and a move of an existing install to the pinned release are shown and must be confirmed
+# (YES=1 skips the questions).
+langfuse-install: ## Install a local Langfuse: the pinned release, .env with generated passwords, ports on 127.0.0.1
+	@$(LANGFUSE) install $(if $(filter 1,$(YES)),--yes,)
+
+langfuse-up: ## Start the installed Langfuse
+	@$(LANGFUSE) up
+
+langfuse-down: ## Stop Langfuse; the traces stay
+	@$(LANGFUSE) down
+
+langfuse-status: ## Langfuse: are the seven containers up, the ports local only, the version the pinned one?
+	@$(LANGFUSE) status
+
+# Writes your own Claude config, like `make mcp`. Undo: claude plugin uninstall.
+langfuse-plugin: ## Install the Claude Code plugin that sends your sessions to the local Langfuse, pinned
+	@$(LANGFUSE) plugin
+
+# The only destructive Langfuse target. It lists what goes and asks; there is no YES=1.
+langfuse-reset: ## DELETE every trace, the Langfuse account and its passwords (asks first)
+	@$(LANGFUSE) reset

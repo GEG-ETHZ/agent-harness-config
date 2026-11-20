@@ -22,10 +22,14 @@ Ask before you run anything:
    them from there, never as plain text: follow [README.md, *Tokens*](README.md#tokens) and
    use its item names. Never read or print a token yourself. URLs go in `.env`, copied from
    `.env.example`, which lists every variable `make mcp` reads.
+3. **Do they want their agent sessions traced in a local Langfuse?** Optional, for people
+   who work with agents. It needs a Docker engine with 8 GiB and keeps full transcripts
+   on their machine; `langfuse/README.md` has the steps that are theirs.
 
 Then run, in order: `make install`, `make setup-user`, `make doctor`, then
 `make install-project PROJECT=<path>` for each Cursor or Antigravity project, then `make mcp`
-if they want the servers. `make doctor` should report nothing to fix.
+if they want the servers, and `make langfuse-install` if they want Langfuse. `make doctor`
+should report nothing to fix.
 
 ## Install and update
 
@@ -71,6 +75,11 @@ make clean       # remove the materialized .ecc/ checkout
 make sandbox-install  # install claude-sb, Claude Code in an OS sandbox (macOS, optional)
 make sandbox-test     # probe the claude-sb policy in sandbox/ (macOS)
 make sandbox-policy   # the policy claude-sb runs with, your policy.local.json merged in
+make langfuse-install # install a local Langfuse for traces of your sessions (optional, needs Docker)
+make langfuse-up      # start it; langfuse-down stops it and keeps the traces
+make langfuse-status  # seven containers up, ports on 127.0.0.1 only, the pinned version
+make langfuse-plugin  # install the pinned Claude Code plugin that sends sessions to it
+make langfuse-reset   # delete every trace and the passwords (asks first)
 ```
 
 `make install` is reversible: ECC records every file it writes in an install-state file, and
@@ -189,6 +198,7 @@ person has to reverse-engineer.
 | changes the variables `make mcp` reads | `.env.example` |
 | changes what loads when, or where files land | the diagrams and tables in `README.md` |
 | changes `sandbox/` | `sandbox/README.md`: every policy entry has a row (`make test` checks) |
+| changes `langfuse/` or `tools/langfuse-local.py` | `langfuse/README.md`; a moved pin also `UPSTREAM.md` |
 
 `UPSTREAM.md` is specific to this repo — it exists because we consume a pinned upstream, and
 nothing else we build does. The other three generalise.
@@ -263,6 +273,11 @@ and worth setting a ceiling on.
   `make doctor` names the out-of-date files. It is a separate component, not a skill, rule,
   command or hook, and its docs explain only the code: nothing about the team goes in
   `sandbox/`. The `srt` version is pinned once, as `SRT_VERSION` in `claude-sb-run.mjs`.
+- **`langfuse/` is not part of `make install` either.** `make langfuse-install` clones
+  Langfuse outside this repo and starts it with Docker; `make update` only says when the
+  pin moved. Both versions, the server's and the plugin's, are pinned once, in
+  `upstream.json`; `tests/test_langfuse.py` fails if one is written anywhere else. A newer
+  Langfuse migrates its databases on start, so a pin never moves back.
 
 ## Definition of done
 
