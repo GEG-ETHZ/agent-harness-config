@@ -31,7 +31,7 @@ setup: ## Set up this repo for contributing (git hooks) — not needed just to i
 	pre-commit install-hooks
 	pre-commit run --all-files || true
 	@echo
-	@echo "Hooks active. They run on every commit to this repo."
+	@echo "Hooks active. They run on every commit and push in this repo."
 
 # opencode needs a compiled plugin payload under .ecc/.opencode/dist before its target
 # will install, and building it needs upstream's own dev dependencies — the TypeScript
