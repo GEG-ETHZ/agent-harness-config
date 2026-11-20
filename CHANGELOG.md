@@ -11,6 +11,17 @@ library with an API.
 
 Run `make setup-user` again after `make update`.
 
+- Langfuse, run locally (optional): `make langfuse-install` clones the pinned Langfuse
+  release to `~/opt/langfuse`, writes its `.env` with generated passwords (mode 600),
+  turns usage telemetry off, pins the images, binds the web UI, MinIO and the AI gateway
+  to `127.0.0.1` and checks the seven containers. `make langfuse-plugin` installs the
+  Claude Code plugin from a marketplace pinned to a tag. `make langfuse-up`,
+  `langfuse-down` and `langfuse-status` run it; `make langfuse-reset` deletes the traces
+  and asks first. `make doctor` and `make update` say when an install is behind the pin.
+  An install made by hand before is kept, passwords and traces included, and is asked
+  about before it moves to the pinned release. Not part of `make install` or
+  `make update`. See `langfuse/README.md`.
+
 - claude-sb: supervised also closes the Postgres, MySQL and mongosh credential files
   (`~/.pgpass`, `~/.my.cnf`, `~/.mongodb`), and both profiles stop the agent from
   overwriting `.env`, `.env.local` and `.env.*.local`, which it cannot read.
