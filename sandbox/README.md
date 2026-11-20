@@ -96,17 +96,10 @@ from `brew install node`).
       limited to reading code. It cannot tell whether yours is: a
       fine-grained token with Contents: Read and write passes too. Setting
       Read-only is up to you, and `make sandbox-test` (step 6) checks it.
-   2. Store it in the Keychain, and export it from `~/.zprofile` (VS Code
-      reads that file, not `~/.zshrc`):
-
-      ```bash
-      security add-generic-password -U -s github-token -a "$USER" -w
-
-      # ~/.zprofile — only if not set yet, so a value passed in from outside wins
-      [[ -z $GITHUB_PERSONAL_ACCESS_TOKEN ]] && GITHUB_PERSONAL_ACCESS_TOKEN=$(security find-generic-password -s github-token -a "$USER" -w 2>/dev/null) && export GITHUB_PERSONAL_ACCESS_TOKEN
-      ```
-
-      Without the `[[ -z ... ]]` check, a shell started inside the sandbox
+   2. Store it in the Keychain as `github-token` and export it as
+      `GITHUB_PERSONAL_ACCESS_TOKEN` from `~/.zprofile`, with the "only if not
+      set yet" check. The main `README.md` (*First 10 minutes*, Tokens) has
+      the two lines. Without the check, a shell started inside the sandbox
       reads `~/.zprofile`, cannot reach the Keychain, and empties the token.
 
 4. **For strict: create your policy.** Skip this step for supervised. Start
@@ -152,7 +145,8 @@ MCP servers in the VS Code panel start without them. Keeping them in the
 Keychain is recommended but not required: an exported token is readable
 inside the sandbox either way (Limitations), but a token kept as plain text
 in a file in `~` is readable in supervised even when it was not meant for
-this session. The main `README.md` (*First 10 minutes*) shows how.
+this session. The main `README.md` (*First 10 minutes*, Tokens) shows how,
+with the item names.
 
 After pulling changes to `sandbox/`, run `make sandbox-install` again;
 `make doctor` warns when the installed copy is out of date. If a policy

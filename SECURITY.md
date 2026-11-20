@@ -27,8 +27,9 @@ team, not a bug in one project.
   `custom/skills/skills-lock.json`. `make validate` fails if a custom skill would shadow an
   upstream one of the same name.
 - **No credential lives in the repository.** MCP tokens are listed by name only
-  (`personalEnv` in the overlay) and read from the environment or a gitignored `.env` when
-  `make mcp` runs. `make mcp` masks credential values in everything it prints.
+  (`personalEnv` in the overlay). `make mcp` checks that they are exported in the shell,
+  never stores them, and masks credential values in everything it prints. Where a token
+  is kept is in [README.md, *Tokens*](README.md#tokens).
 - **Secrets are blocked at commit time.** `detect-secrets` runs as a pre-commit hook, and a
   second hook refuses any JSON file shaped like a GCP service-account key.
 - **Installs are reversible.** `make install` records every file it writes and
@@ -46,8 +47,8 @@ team, not a bug in one project.
 - An installed skill or rule is text that an agent follows. Review a vendored skill as you
   would code: it can tell an agent to run commands.
 - MCP servers run third-party code with your tokens and network access. `UPSTREAM.md`
-  records what each one reaches. Once `make mcp` runs, the tokens sit in plain text in your
-  own Claude config.
+  records what each one reaches. Every exported token is readable by every program you
+  start from that shell, the servers included.
 - Whatever you show a cloud-hosted agent goes to that agent's model provider under its
   terms. Nothing here changes that.
 - Rules are advisory. Only hooks, the deny list and pre-commit actually block anything.

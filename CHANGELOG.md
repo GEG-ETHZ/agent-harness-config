@@ -11,6 +11,14 @@ library with an API.
 
 Run `make setup-user` again after `make update`.
 
+- Tokens: one way to store and export them, in `README.md` under *First 10 minutes*,
+  *Tokens*, with the Linux (`secret-tool`) line next to each macOS one. The Keychain items
+  are named `confluence-token`, `jira-token`, `github-token` and `claude-sb-oauth`, and
+  per-owner GitHub tokens picked with direnv `github-token-<owner>`. `sandbox/README.md`,
+  `AGENTS.md`, `.env.example`, `SECURITY.md` and the `make mcp` hints link there. If you
+  stored a token under another name (the README used `github-myorg` in its direnv
+  example), store it again under the new name, point your `~/.zprofile` or `.envrc` line
+  at it, and delete the old item.
 - Langfuse, run locally (optional): `make langfuse-install` clones the pinned Langfuse
   release to `~/opt/langfuse`, writes its `.env` with generated passwords (mode 600),
   turns usage telemetry off, pins the images, binds the web UI, MinIO and the AI gateway

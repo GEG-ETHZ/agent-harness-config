@@ -18,9 +18,10 @@ Ask before you run anything:
    machine. Cursor and Antigravity install per project, so ask which project folders.
 2. **Do they want the Confluence, Jira and BigQuery servers, and the opt-in GitHub one?** If
    yes, they need their Confluence URL and token (and optionally Jira's) first. Ask for
-   them; never guess. Tokens go in the macOS Keychain, and their shell profile exports them
-   by reading them from there (README.md, *First 10 minutes*), never as plain text. URLs go
-   in `.env`, copied from `.env.example`, which lists every variable `make mcp` reads.
+   them; never guess. Tokens go in the Keychain, and `~/.zprofile` exports them by reading
+   them from there, never as plain text: follow [README.md, *Tokens*](README.md#tokens) and
+   use its item names. Never read or print a token yourself. URLs go in `.env`, copied from
+   `.env.example`, which lists every variable `make mcp` reads.
 3. **Do they want their agent sessions traced in a local Langfuse?** Optional, for people
    who work with agents. It needs a Docker engine with 8 GiB and keeps full transcripts
    on their machine; `langfuse/README.md` has the steps that are theirs.
@@ -42,8 +43,9 @@ make update      # thereafter — pulls this repo and reinstalls
 ones also from `.env` (copy `.env.example`): `CONFLUENCE_URL` and `CONFLUENCE_TOKEN` (plus
 optional `JIRA_URL` and `JIRA_TOKEN`) for Atlassian. GitHub is opt-in with
 `make mcp ADD=github` and needs `GITHUB_PERSONAL_ACCESS_TOKEN` (fine-grained, scoped to the
-repos you use) and `brew install github-mcp-server`. Tokens must be exported in the shell:
-`make mcp` never stores them, the servers inherit them when Claude Code starts. If you are
+repos you use) and `brew install github-mcp-server`. Tokens must be exported in the shell,
+the way [README.md, *Tokens*](README.md#tokens) describes: `make mcp` never stores them,
+the servers inherit them when Claude Code starts. If you are
 an agent setting this up for someone, ask them for those rather than guessing; `make mcp`
 names the variable and skips that one server when it cannot find it. Tokens come from each
 system's own profile settings.

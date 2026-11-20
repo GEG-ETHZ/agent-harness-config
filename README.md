@@ -69,30 +69,15 @@ BigQuery, Miro boards, and self-hosted Jira and Confluence. A fifth, GitHub, is 
 Miro authenticates in the browser and needs nothing from you first. The others need personal
 values:
 
-- **Tokens go in the macOS Keychain**, never as plain text in a file: not here, and not in
-  your shell profile, which any program you run can read. The profile exports them by
-  reading the Keychain (below). `make mcp` checks they are set but does not store them;
-  each server reads them from the shell you start Claude Code in. A changed token takes
-  effect on the next Claude Code start.
+- **Tokens** are stored and exported the one way [Tokens](#tokens) describes. `make mcp`
+  checks they are set but does not store them; each server reads them from the shell you
+  start Claude Code in. A changed token takes effect on the next Claude Code start.
 - **Everything else** (instance URLs, the GCP project) can also go in `.env`, which is
   gitignored:
 
 ```bash
 cp .env.example .env   # then fill in the values for the servers you want
 ```
-
-A token, once per token (`security` asks for the value, so it never lands in your shell
-history), and the line that exports it, in `~/.zprofile`:
-
-```bash
-security add-generic-password -a "$USER" -s confluence-token -w
-
-# ~/.zprofile — only if not set yet, so a value passed in from outside wins
-[[ -z $CONFLUENCE_TOKEN ]] && CONFLUENCE_TOKEN=$(security find-generic-password -a "$USER" -s confluence-token -w 2>/dev/null) && export CONFLUENCE_TOKEN
-```
-
-The same for `JIRA_TOKEN` and `GITHUB_PERSONAL_ACCESS_TOKEN`. On Linux, use your secret
-store the same way (`secret-tool lookup ...`).
 
 `CONFLUENCE_URL` and `CONFLUENCE_TOKEN` are required for the Atlassian server, `JIRA_URL` and
 `JIRA_TOKEN` are optional, and tokens come from each system's own profile settings. The
@@ -101,17 +86,75 @@ Cloud sites. If a value is missing, `make mcp` says so and skips that one server
 failing everything.
 
 The GitHub server also needs its program: `brew install github-mcp-server`. It reaches the
-repos of whichever token is in the shell, and a fine-grained token covers one owner. For
-several owners, keep one token per owner and pick it per folder with
-[direnv](https://direnv.net/), the token itself in the macOS keychain:
+repos of whichever token is in the shell, and a fine-grained token covers one owner; for
+several owners see step 3 under [Tokens](#tokens).
 
-```bash
-security add-generic-password -a "$USER" -s github-myorg -w   # asks for the token
+### Tokens
 
-# ~/projects/myorg/.envrc — applies to every repo under it; run `direnv allow` once
-export GITHUB_PERSONAL_ACCESS_TOKEN=$(security find-generic-password -s github-myorg -w)
-export GH_TOKEN="$GITHUB_PERSONAL_ACCESS_TOKEN"   # gh follows the same token
-```
+The one way to handle every personal token this config uses. Every other document in this
+repo follows it and links here.
+
+| Keychain item | Exported as | Used by |
+| --- | --- | --- |
+| `confluence-token` | `CONFLUENCE_TOKEN` | Atlassian server |
+| `jira-token` | `JIRA_TOKEN` | Atlassian server (optional) |
+| `github-token` | `GITHUB_PERSONAL_ACCESS_TOKEN` | GitHub server, and git inside `claude-sb` |
+| `claude-sb-oauth` | not exported; `claude-sb` reads it itself | Claude Code's login inside the sandbox ([`sandbox/README.md`](sandbox/README.md), Install) |
+
+1. **Store each token in the Keychain**, never as plain text in a file (`~/.zprofile`,
+   `~/.zshrc`, `.env`). A backup, a dotfiles repo or an agent reading `~` then finds
+   nothing. The command asks for the value, so it never lands in your shell history, and
+   replaces a value that is already stored:
+
+   ```bash
+   security add-generic-password -U -s confluence-token -a "$USER" -w                    # macOS
+   secret-tool store --label=confluence-token service confluence-token account "$USER"   # Linux
+   ```
+
+2. **Export it from `~/.zprofile`**, one line per token, the same pattern for each:
+
+   ```bash
+   # macOS
+   [[ -z $CONFLUENCE_TOKEN ]] && CONFLUENCE_TOKEN=$(security find-generic-password -s confluence-token -a "$USER" -w 2>/dev/null) && export CONFLUENCE_TOKEN
+   # Linux
+   [[ -z $CONFLUENCE_TOKEN ]] && CONFLUENCE_TOKEN=$(secret-tool lookup service confluence-token account "$USER" 2>/dev/null) && export CONFLUENCE_TOKEN
+   ```
+
+   The `[[ -z ... ]]` check exports only if the variable is not set yet, so a value passed
+   in from outside (`claude-sb`, the VS Code wrapper) wins. Without it, a shell started
+   inside the sandbox reads `~/.zprofile`, cannot reach the Keychain, and empties the token.
+   `~/.zprofile`, not `~/.zshrc`, because VS Code and the `claude-sb` wrapper start a login
+   shell, which reads only `~/.zprofile`. With bash on Linux the file is `~/.bash_profile`.
+
+3. **Use [direnv](https://direnv.net/) only when one token is not enough**, for example
+   GitHub tokens for two owners, each picked per folder. Name the items
+   `github-token-<owner>`:
+
+   ```bash
+   security add-generic-password -U -s github-token-myorg -a "$USER" -w                      # macOS
+   secret-tool store --label=github-token-myorg service github-token-myorg account "$USER"   # Linux
+
+   # ~/projects/myorg/.envrc — applies to every repo under it; run `direnv allow` once
+   token=$(security find-generic-password -s github-token-myorg -a "$USER" -w 2>/dev/null) &&
+     export GITHUB_PERSONAL_ACCESS_TOKEN="$token" GH_TOKEN="$token"   # gh follows the same token
+   ```
+
+   On Linux the lookup in `.envrc` is
+   `secret-tool lookup service github-token-myorg account "$USER"`.
+
+4. **Keep every token small and expiring.** This matters more than where it is stored. For
+   GitHub: fine-grained, only the repositories you work in, Contents read-only so it cannot
+   push code, and an expiry date. Replace a token when it runs out; do not extend its reach.
+
+5. **Let tools that can log in themselves do so** (`gh auth login`, `gcloud auth login`)
+   instead of handing them a token.
+
+**Accepted on purpose:** every program you start from a terminal sees every exported token:
+`make`, scripts, npm packages, Claude Code, and the sandbox too. The Keychain protects the
+file, not the running session. For these tokens (Confluence, Jira, a GitHub token that
+cannot push) one pattern everyone follows is safer than a stricter one people drift away
+from. The stricter way, per-folder tokens with direnv for every token, stays open to
+anyone who wants it.
 
 ### Variables
 
@@ -131,9 +174,9 @@ gcloud config configurations activate proj-a   # switch at any time
 To switch per folder, put `export CLOUDSDK_ACTIVE_CONFIG_NAME=proj-a` in an `.envrc` and use
 [direnv](https://direnv.net/).
 
-**Everything else** is an environment variable. Set it in your shell (`~/.bashrc` or
-`~/.zshrc`), tokens read from the Keychain as above; the values that are not secrets can
-also go in `.env` here for `make mcp`:
+**Everything else** is an environment variable. Export it from `~/.zprofile`, tokens the way
+[Tokens](#tokens) describes; the values that are not secrets can also go in `.env` here for
+`make mcp`:
 
 | Variable | Used by | What it is |
 | --- | --- | --- |
