@@ -4,8 +4,9 @@
 # custom/ is vendored and ported content. It is kept byte-identical to its source so it can be
 # re-synced, so our formatting hooks must not touch it — style belongs to whoever authored it.
 exclude: '^custom/'
-# commit-msg too, so `make setup` installs the trailer guard below alongside the file checks.
-default_install_hook_types: [pre-commit, commit-msg]
+# commit-msg and pre-push too, so `make setup` installs the trailer guard and the gitleaks
+# scan of unpushed commits below alongside the file checks.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -48,11 +49,19 @@ repos:
         exclude: '^upstream\.json$'
 
   # detect-secrets above checks entropy; gitleaks knows the shapes of real provider tokens.
-  # CI also runs it over the full history, which this hook cannot see.
+  # The first hook scans what is staged. The second scans every local commit not yet on a
+  # remote, so a commit made with --no-verify or before `make setup` is caught before it
+  # leaves. The organisation's gitleaks workflow scans the full history on pull requests.
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
       - id: gitleaks
+        stages: [pre-commit]
+      - id: gitleaks
+        name: gitleaks (commits about to be pushed)
+        entry: gitleaks git --redact --verbose --log-opts="--all --not --remotes"
+        always_run: true
+        stages: [pre-push]
 
   - repo: local
     hooks:
