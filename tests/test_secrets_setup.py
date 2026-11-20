@@ -11,6 +11,18 @@ ROOT = Path(__file__).resolve().parent.parent
 PRE_COMMIT = ROOT / ".pre-commit-config.yaml"
 
 
+def test_no_workflow_downloads_gitleaks():
+    # Arrange
+    workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+
+    # Act
+    own = [w.name for w in workflows if "gitleaks/gitleaks/releases" in w.read_text()]
+
+    # Assert
+    assert workflows
+    assert own == []
+
+
 def test_gitleaks_hook_runs_at_commit_and_at_push():
     # Arrange
     config = PRE_COMMIT.read_text()

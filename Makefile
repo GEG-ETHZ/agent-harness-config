@@ -110,8 +110,9 @@ mcp: ## Activate the agreed MCP servers: make mcp [ADD=github] [GCP_PROJECT=x] [
 		$(if $(ADD),--add "$(ADD)",)
 
 # The gate CI runs, runnable locally in one word. Same commands, same order, so a green
-# `make check` means a green PR. The one CI job not here is the gitleaks scan of the full
-# history; the pre-commit gitleaks hook covers the files as they are.
+# `make check` means a green PR. The one check not here is the organisation's gitleaks
+# workflow, which scans the full history; the pre-commit gitleaks hook covers the files as
+# they are.
 check: ## Run every check CI runs (hooks, tests, then the overlay against the pinned upstream)
 	@command -v pre-commit >/dev/null 2>&1 || { \
 		echo "pre-commit not found — run 'make setup' first"; exit 1; }

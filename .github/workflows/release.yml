@@ -16,11 +16,6 @@ jobs:
   # CI is not a release.
   ci:
     uses: ./.github/workflows/ci.yml
-    # A called workflow gets at most the caller's permissions, and CI's gitleaks job
-    # needs pull-requests: read. Without this grant the run fails before it starts.
-    permissions:
-      contents: read
-      pull-requests: read
 
   github-release:
     name: create the GitHub release
