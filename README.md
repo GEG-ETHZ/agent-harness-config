@@ -240,9 +240,12 @@ agent-harness-config/
 │   ├── validate-manifests.py        ← pre-commit gate on the pin and the overlay
 │   ├── check-profile.py             ← the custom profile still resolves after materialize
 │   ├── context-cost.py              ← what the config costs in context per session
-│   └── doctor.py                    ← is what you have installed still current?
+│   ├── doctor.py                    ← is what you have installed still current?
+│   └── langfuse-local.py            ← installs, starts and checks the local Langfuse
 ├── sandbox/                         ← claude-sb: Claude Code inside an OS sandbox
 │                                      (optional, make sandbox-install; sandbox/README.md)
+├── langfuse/                        ← a local Langfuse for traces of your agent sessions
+│                                      (optional, make langfuse-install; langfuse/README.md)
 ├── Makefile                         ← install / update / doctor / context / check / mcp
 ├── UPSTREAM.md                      ← the pin, every delta, and known issues
 ├── CHANGELOG.md                     ← what changed between tags
@@ -278,6 +281,26 @@ It works in the terminal and in the VS Code extension. A strict profile closes e
 and opens only the exceptions you list in `~/.config/claude-sb/policy.local.json`. What it blocks, what it does not, and the
 login token it needs: `sandbox/README.md`.
 `make doctor` reports an installed copy that is older than `sandbox/`.
+
+### Optional: Langfuse, traces of your agent sessions
+
+[Langfuse](https://langfuse.com) shows what a session did, turn by turn, with tokens, cost
+and duration. It runs on your own machine and nothing leaves it. It is not part of
+`make install` or `make update`: it needs a Docker engine with 4 CPUs and 8 GiB of memory
+(with Colima: `colima start --cpu 4 --memory 8`) and about 6 GB of images.
+
+```bash
+make langfuse-install   # the pinned release in ~/opt/langfuse, generated passwords, ports on 127.0.0.1
+make langfuse-plugin    # the pinned Claude Code plugin that sends your sessions to it
+make langfuse-status    # seven containers up, ports local only, the pinned version
+make langfuse-down      # stop it; langfuse-up starts it again, the traces stay
+```
+
+`make langfuse-install` ends with the steps that are yours: an account in the local web
+UI, two API keys in the Keychain, four lines in `~/.zprofile`. **A trace holds everything
+a session read, secrets in files included.** That, how it behaves in `claude-sb`, and
+`make langfuse-reset`, which deletes everything: [`langfuse/README.md`](langfuse/README.md).
+`make doctor` reports an install that is behind the pin or no longer local-only.
 
 ### Cursor and Antigravity are project-scoped
 
